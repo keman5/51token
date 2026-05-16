@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import * as z from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -146,6 +146,7 @@ type PerformanceStats = {
 export function PerformanceSection(props: Props) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
+  const formRef = useRef<HTMLFormElement>(null)
   const [stats, setStats] = useState<PerformanceStats | null>(null)
   const [logInfo, setLogInfo] = useState<LogInfo | null>(null)
   const [logCleanupMode, setLogCleanupMode] = useState('by_count')
@@ -155,11 +156,11 @@ export function PerformanceSection(props: Props) {
   const form = useForm<PerfFormValues>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(perfSchema) as any,
-    defaultValues: props.defaultValues,
+    defaultValues: { ...props.defaultValues },
   })
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  useResetForm(form as any, props.defaultValues)
+  useResetForm(form as any, { ...props.defaultValues })
 
   const fetchStats = useCallback(async () => {
     try {
@@ -202,6 +203,98 @@ export function PerformanceSection(props: Props) {
     }
     toast.success(t('Saved successfully'))
     fetchStats()
+  }
+
+  const onInvalid = () => {
+    toast.error(t('Please enter a valid number'))
+  }
+
+  const readFormValues = () => {
+    const values = { ...form.getValues() }
+    const formEl = formRef.current
+    if (!formEl) return values
+
+    const readInputValue = (key: keyof PerfFormValues) =>
+      formEl.querySelector<HTMLInputElement>(`input[name="${key}"]`)?.value
+
+    const readNumberValue = (key: keyof PerfFormValues) => {
+      const value = readInputValue(key)
+      return value === undefined ? values[key] : value
+    }
+
+    const readBooleanValue = (key: keyof PerfFormValues) => {
+      const el = formEl.querySelector<HTMLElement>(`[data-setting-key="${key}"]`)
+      if (!el) return values[key]
+      return (
+        el.getAttribute('aria-checked') === 'true' ||
+        el.hasAttribute('data-checked')
+      )
+    }
+
+    const bucketText =
+      formEl
+        .querySelector<HTMLElement>(
+          '[data-setting-key="perf_metrics_setting.bucket_time"]'
+        )
+        ?.textContent?.trim() ?? ''
+
+    return {
+      ...values,
+      'performance_setting.disk_cache_enabled': readBooleanValue(
+        'performance_setting.disk_cache_enabled'
+      ),
+      'performance_setting.disk_cache_threshold_mb': readNumberValue(
+        'performance_setting.disk_cache_threshold_mb'
+      ),
+      'performance_setting.disk_cache_max_size_mb': readNumberValue(
+        'performance_setting.disk_cache_max_size_mb'
+      ),
+      'performance_setting.disk_cache_path':
+        readInputValue('performance_setting.disk_cache_path') ??
+        values['performance_setting.disk_cache_path'],
+      'performance_setting.monitor_enabled': readBooleanValue(
+        'performance_setting.monitor_enabled'
+      ),
+      'performance_setting.monitor_cpu_threshold': readNumberValue(
+        'performance_setting.monitor_cpu_threshold'
+      ),
+      'performance_setting.monitor_memory_threshold': readNumberValue(
+        'performance_setting.monitor_memory_threshold'
+      ),
+      'performance_setting.monitor_disk_threshold': readNumberValue(
+        'performance_setting.monitor_disk_threshold'
+      ),
+      'perf_metrics_setting.enabled': readBooleanValue(
+        'perf_metrics_setting.enabled'
+      ),
+      'perf_metrics_setting.flush_interval': readNumberValue(
+        'perf_metrics_setting.flush_interval'
+      ),
+      'perf_metrics_setting.bucket_time': bucketText.includes('5')
+        ? '5min'
+        : bucketText.includes('hour') || bucketText.includes('小时')
+          ? 'hour'
+          : bucketText.includes('minute') || bucketText.includes('分钟')
+            ? 'minute'
+          : values['perf_metrics_setting.bucket_time'],
+      'perf_metrics_setting.retention_days': readNumberValue(
+        'perf_metrics_setting.retention_days'
+      ),
+    }
+  }
+
+  const handleSave = async () => {
+    const parsed = perfSchema.safeParse(readFormValues())
+    if (!parsed.success) {
+      onInvalid()
+      return
+    }
+    await onSubmit(parsed.data)
+  }
+
+  const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    void handleSave()
   }
 
   const clearDiskCache = async () => {
@@ -301,7 +394,11 @@ export function PerformanceSection(props: Props) {
       )}
     >
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-6'>
+        <form
+          ref={formRef}
+          onSubmit={handleFormSubmit}
+          className='space-y-6'
+        >
           {/* Disk Cache Settings */}
           <div>
             <h4 className='font-medium'>{t('Disk Cache Settings')}</h4>
@@ -320,6 +417,7 @@ export function PerformanceSection(props: Props) {
                 <FormItem className='flex items-center gap-2'>
                   <FormControl>
                     <Switch
+                      data-setting-key='performance_setting.disk_cache_enabled'
                       checked={field.value}
                       onCheckedChange={field.onChange}
                     />
@@ -335,7 +433,15 @@ export function PerformanceSection(props: Props) {
                 <FormItem>
                   <FormLabel>{t('Disk Cache Threshold (MB)')}</FormLabel>
                   <FormControl>
-                    <Input type='number' {...field} disabled={!diskEnabled} />
+                    <Input
+                      type='number'
+                      {...field}
+                      readOnly={!diskEnabled}
+                      aria-disabled={!diskEnabled}
+                      className={
+                        !diskEnabled ? 'cursor-not-allowed opacity-50' : ''
+                      }
+                    />
                   </FormControl>
                   <FormDescription>
                     {t('Use disk cache when request body exceeds this size')}
@@ -350,7 +456,15 @@ export function PerformanceSection(props: Props) {
                 <FormItem>
                   <FormLabel>{t('Max Disk Cache Size (MB)')}</FormLabel>
                   <FormControl>
-                    <Input type='number' {...field} disabled={!diskEnabled} />
+                    <Input
+                      type='number'
+                      {...field}
+                      readOnly={!diskEnabled}
+                      aria-disabled={!diskEnabled}
+                      className={
+                        !diskEnabled ? 'cursor-not-allowed opacity-50' : ''
+                      }
+                    />
                   </FormControl>
                   {stats?.disk_space_info &&
                     stats.disk_space_info.total > 0 && (
@@ -388,7 +502,11 @@ export function PerformanceSection(props: Props) {
                       )}
                       {...field}
                       value={field.value ?? ''}
-                      disabled={!diskEnabled}
+                      readOnly={!diskEnabled}
+                      aria-disabled={!diskEnabled}
+                      className={
+                        !diskEnabled ? 'cursor-not-allowed opacity-50' : ''
+                      }
                     />
                   </FormControl>
                 </FormItem>
@@ -418,6 +536,7 @@ export function PerformanceSection(props: Props) {
                 <FormItem className='flex items-center gap-2'>
                   <FormControl>
                     <Switch
+                      data-setting-key='performance_setting.monitor_enabled'
                       checked={field.value}
                       onCheckedChange={field.onChange}
                     />
@@ -436,7 +555,11 @@ export function PerformanceSection(props: Props) {
                     <Input
                       type='number'
                       {...field}
-                      disabled={!monitorEnabled}
+                      readOnly={!monitorEnabled}
+                      aria-disabled={!monitorEnabled}
+                      className={
+                        !monitorEnabled ? 'cursor-not-allowed opacity-50' : ''
+                      }
                     />
                   </FormControl>
                 </FormItem>
@@ -452,7 +575,11 @@ export function PerformanceSection(props: Props) {
                     <Input
                       type='number'
                       {...field}
-                      disabled={!monitorEnabled}
+                      readOnly={!monitorEnabled}
+                      aria-disabled={!monitorEnabled}
+                      className={
+                        !monitorEnabled ? 'cursor-not-allowed opacity-50' : ''
+                      }
                     />
                   </FormControl>
                 </FormItem>
@@ -468,7 +595,11 @@ export function PerformanceSection(props: Props) {
                     <Input
                       type='number'
                       {...field}
-                      disabled={!monitorEnabled}
+                      readOnly={!monitorEnabled}
+                      aria-disabled={!monitorEnabled}
+                      className={
+                        !monitorEnabled ? 'cursor-not-allowed opacity-50' : ''
+                      }
                     />
                   </FormControl>
                 </FormItem>
@@ -495,6 +626,7 @@ export function PerformanceSection(props: Props) {
                 <FormItem className='flex items-center gap-2'>
                   <FormControl>
                     <Switch
+                      data-setting-key='perf_metrics_setting.enabled'
                       checked={field.value}
                       onCheckedChange={field.onChange}
                     />
@@ -514,7 +646,13 @@ export function PerformanceSection(props: Props) {
                       type='number'
                       min={1}
                       {...field}
-                      disabled={!perfMetricsEnabled}
+                      readOnly={!perfMetricsEnabled}
+                      aria-disabled={!perfMetricsEnabled}
+                      className={
+                        !perfMetricsEnabled
+                          ? 'cursor-not-allowed opacity-50'
+                          : ''
+                      }
                     />
                   </FormControl>
                 </FormItem>
@@ -538,7 +676,12 @@ export function PerformanceSection(props: Props) {
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue />
+                        <span
+                          data-setting-key='perf_metrics_setting.bucket_time'
+                          className='contents'
+                        >
+                          <SelectValue />
+                        </span>
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent alignItemWithTrigger={false}>
@@ -563,7 +706,13 @@ export function PerformanceSection(props: Props) {
                       type='number'
                       min={0}
                       {...field}
-                      disabled={!perfMetricsEnabled}
+                      readOnly={!perfMetricsEnabled}
+                      aria-disabled={!perfMetricsEnabled}
+                      className={
+                        !perfMetricsEnabled
+                          ? 'cursor-not-allowed opacity-50'
+                          : ''
+                      }
                     />
                   </FormControl>
                   <FormDescription>
@@ -574,7 +723,11 @@ export function PerformanceSection(props: Props) {
             />
           </div>
 
-          <Button type='submit' disabled={updateOption.isPending}>
+          <Button
+            type='button'
+            disabled={updateOption.isPending}
+            onClick={() => void handleSave()}
+          >
             {updateOption.isPending ? t('Saving...') : t('Save Changes')}
           </Button>
         </form>
