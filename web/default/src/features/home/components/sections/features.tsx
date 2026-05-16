@@ -17,17 +17,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import {
-  Zap,
-  Shield,
-  Globe,
-  Code,
-  Gauge,
-  DollarSign,
+  Activity,
+  Code2,
+  Lock,
+  Server,
+  ShieldCheck,
+  Sparkles,
   Users,
-  HeartHandshake,
+  Zap,
 } from 'lucide-react'
+import { motion } from 'motion/react'
 import { useTranslation } from 'react-i18next'
-import { AnimateInView } from '@/components/animate-in-view'
 
 interface FeaturesProps {
   className?: string
@@ -38,200 +38,102 @@ export function Features(_props: FeaturesProps) {
 
   const features = [
     {
-      id: 'fast',
-      num: '01',
-      title: t('Lightning Fast'),
-      desc: t(
-        'Optimized network architecture ensures millisecond response times'
+      title: t('100% 协议兼容'),
+      description: t(
+        '完全兼容 OpenAI 原生接口协议。你的业务代码只需修改 API Base 与 API Key，即可无缝迁移，零学习成本。'
       ),
-      span: 'md:col-span-2',
-      icon: <Zap className='size-4 text-blue-400' />,
-      visual: (
-        <div className='mt-4 grid grid-cols-3 gap-2'>
-          {['OpenAI', 'Claude', 'Gemini', 'DeepSeek', 'Qwen', 'Llama'].map(
-            (name) => (
-              <div
-                key={name}
-                className='border-border/30 bg-muted/20 text-muted-foreground flex items-center justify-center rounded-lg border px-3 py-2 text-xs transition-colors duration-300 hover:border-blue-500/30 hover:bg-blue-500/5'
-              >
-                {name}
-              </div>
-            )
-          )}
-        </div>
+      icon: Zap,
+    },
+    {
+      title: t('动态负载均衡'),
+      description: t(
+        '内置高可用账号池管理。系统智能监控各 Codex Pro 账号的请求频率，自动剔除限流账号并重试。'
       ),
+      icon: Server,
     },
     {
-      id: 'secure',
-      num: '02',
-      title: t('Secure & Reliable'),
-      desc: t(
-        'Enterprise-grade security with comprehensive permission management'
+      title: t('详尽的调用日志'),
+      description: t(
+        '记录每一次 API 调用的耗时、Token 消耗、IP 来源及响应状态，支持多维度查询与数据导出。'
       ),
-      span: 'md:col-span-1',
-      icon: <Shield className='size-4 text-emerald-400' />,
-      visual: (
-        <div className='mt-4 flex items-center justify-center'>
-          <div className='relative'>
-            <div className='flex size-16 items-center justify-center rounded-2xl border border-emerald-500/20 bg-emerald-500/5'>
-              <Shield
-                className='size-7 text-emerald-500/70'
-                strokeWidth={1.5}
-              />
-            </div>
-            <div className='absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-emerald-500'>
-              <svg
-                className='size-2.5 text-white'
-                fill='none'
-                viewBox='0 0 24 24'
-                stroke='currentColor'
-                strokeWidth={3}
-              >
-                <path
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                  d='m4.5 12.75 6 6 9-13.5'
-                />
-              </svg>
-            </div>
-          </div>
-        </div>
+      icon: Activity,
+    },
+    {
+      title: t('细粒度权限控制'),
+      description: t(
+        '为主帐号创建多个子密钥，每个子密钥可单独设置额度、模型权限、IP 白名单及过期时间。'
       ),
+      icon: ShieldCheck,
     },
     {
-      id: 'global',
-      num: '03',
-      title: t('Global Coverage'),
-      desc: t('Multi-region deployment for stable global access'),
-      span: 'md:col-span-1',
-      icon: <Globe className='size-4 text-violet-400' />,
-      visual: (
-        <div className='mt-4 space-y-2'>
-          {[t('Load Balancing'), t('Rate Limiting'), t('Cost Tracking')].map(
-            (step, i) => (
-              <div key={step} className='flex items-center gap-2'>
-                <div
-                  className={`flex size-6 items-center justify-center rounded-full text-[10px] font-bold ${
-                    i === 1
-                      ? 'border border-blue-500/30 bg-blue-500/20 text-blue-500'
-                      : 'border-border/40 bg-muted text-muted-foreground border'
-                  }`}
-                >
-                  {i + 1}
-                </div>
-                <div className='bg-border/40 h-px flex-1' />
-                <span className='text-muted-foreground text-xs'>{step}</span>
-              </div>
-            )
-          )}
-        </div>
+      title: t('多租户与计费隔离'),
+      description: t(
+        '不同部门或项目组可使用不同的 Key，账单各自独立，额度使用情况清晰可追踪。'
       ),
+      icon: Users,
     },
     {
-      id: 'developer',
-      num: '04',
-      title: t('Developer Friendly'),
-      desc: t('Compatible API routes for common AI application workflows'),
-      span: 'md:col-span-2',
-      icon: <Code className='size-4 text-amber-400' />,
-      visual: (
-        <div className='mt-4 flex items-center gap-3'>
-          <div className='flex -space-x-2'>
-            {['API', 'SDK', 'CLI', 'Docs'].map((n) => (
-              <div
-                key={n}
-                className='border-background from-muted to-muted/60 text-muted-foreground flex size-8 items-center justify-center rounded-full border-2 bg-gradient-to-br text-[9px] font-bold'
-              >
-                {n}
-              </div>
-            ))}
-          </div>
-          <div className='text-muted-foreground flex items-center gap-1.5 text-xs'>
-            <Code className='size-3.5 text-blue-500' />
-            {t('Multi-protocol Compatible')}
-          </div>
-        </div>
+      title: t('数据脱敏与隐私保护'),
+      description: t(
+        '网关层专注数据流转发与用量统计，避免业务 Prompt 与响应内容在本地落盘。'
       ),
-    },
-  ]
-
-  const additionalFeatures = [
-    {
-      icon: <Gauge className='size-5' strokeWidth={1.5} />,
-      title: t('High Performance'),
-      desc: t('Support for high concurrency with automatic load balancing'),
+      icon: Lock,
     },
     {
-      icon: <DollarSign className='size-5' strokeWidth={1.5} />,
-      title: t('Transparent Billing'),
-      desc: t('Pay-as-you-go with real-time usage monitoring'),
+      title: t('流式响应毫无延迟'),
+      description: t(
+        '核心转发层采用高效的非阻塞 I/O，SSE 流式返回延迟保持在更轻盈的体验区间。'
+      ),
+      icon: Sparkles,
     },
     {
-      icon: <Users className='size-5' strokeWidth={1.5} />,
-      title: t('Team Collaboration'),
-      desc: t('Multi-user management with flexible permission allocation'),
-    },
-    {
-      icon: <HeartHandshake className='size-5' strokeWidth={1.5} />,
-      title: t('Open Source'),
-      desc: t('Community driven, self-hosted, and extensible'),
+      title: t('极其简单的运维'),
+      description: t(
+        '后台提供完善的大盘监控体系，一站式管理所有渠道、用户状态及系统配置。'
+      ),
+      icon: Code2,
     },
   ]
 
   return (
-    <section className='relative z-10 px-6 py-24 md:py-32'>
-      <div className='mx-auto max-w-6xl'>
-        <AnimateInView className='mb-16 max-w-lg'>
-          <p className='text-muted-foreground mb-3 text-xs font-medium tracking-widest uppercase'>
-            {t('Core Features')}
-          </p>
-          <h2 className='text-2xl leading-tight font-bold tracking-tight md:text-3xl'>
-            {t('Built for developers,')}
-            <br />
-            {t('designed for scale')}
-          </h2>
-        </AnimateInView>
+    <section className='bg-background border-border/60 relative overflow-hidden border-t py-24'>
+      <div
+        aria-hidden
+        className='bg-primary/5 pointer-events-none absolute top-0 right-0 size-[36rem] translate-x-1/3 -translate-y-1/3 rounded-full blur-3xl'
+      />
 
-        {/* Bento grid */}
-        <div className='border-border/40 bg-border/40 grid gap-px overflow-hidden rounded-xl border md:grid-cols-3'>
-          {features.map((f, i) => (
-            <AnimateInView
-              key={f.id}
-              delay={i * 100}
-              animation='scale-in'
-              className={`bg-background group hover:bg-muted/20 p-7 transition-colors duration-300 md:p-8 ${f.span}`}
-            >
-              <div className='mb-3 flex items-center gap-3'>
-                <span className='border-border/40 bg-muted text-muted-foreground flex size-7 items-center justify-center rounded-md border text-[10px] font-semibold tabular-nums'>
-                  {f.num}
-                </span>
-                <h3 className='text-sm font-semibold'>{f.title}</h3>
-              </div>
-              <p className='text-muted-foreground text-sm leading-relaxed'>
-                {f.desc}
-              </p>
-              {f.visual}
-            </AnimateInView>
-          ))}
+      <div className='container-main relative z-10'>
+        <div className='mb-16 text-center'>
+          <h2 className='text-foreground mb-4 text-3xl font-bold tracking-tight md:text-4xl'>
+            {t('高可用 AI 服务的核心基础设施')}
+          </h2>
+          <p className='text-muted-foreground mx-auto max-w-2xl text-lg'>
+            {t(
+              '不止于简单的接口转发，更为团队资源管理、高并发调度与可观测性提供完善的系统保障。'
+            )}
+          </p>
         </div>
 
-        {/* Additional features row */}
-        <div className='mt-12 grid grid-cols-2 gap-8 md:grid-cols-4 md:gap-12'>
-          {additionalFeatures.map((f, i) => (
-            <AnimateInView
-              key={f.title}
-              delay={i * 100}
-              animation='fade-up'
-              className='flex flex-col items-center text-center'
+        <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-4'>
+          {features.map((feature, index) => (
+            <motion.div
+              key={feature.title}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.45, delay: index * 0.05 }}
+              className='panel-card group hover:bg-muted/30 p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg'
             >
-              <div className='text-muted-foreground border-border/50 bg-muted/30 group-hover:text-foreground mb-3 flex size-12 items-center justify-center rounded-xl border transition-colors'>
-                {f.icon}
+              <div className='border-border bg-background group-hover:border-primary/40 mb-6 flex size-12 items-center justify-center rounded-xl border shadow-inner transition-colors'>
+                <feature.icon className='text-muted-foreground group-hover:text-foreground size-6 transition-colors' />
               </div>
-              <h3 className='mb-1.5 text-sm font-semibold'>{f.title}</h3>
-              <p className='text-muted-foreground max-w-[200px] text-xs leading-relaxed'>
-                {f.desc}
+              <h3 className='text-foreground mb-2 text-lg font-bold'>
+                {feature.title}
+              </h3>
+              <p className='text-muted-foreground text-sm leading-relaxed font-medium'>
+                {feature.description}
               </p>
-            </AnimateInView>
+            </motion.div>
           ))}
         </div>
       </div>
