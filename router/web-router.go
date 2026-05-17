@@ -32,7 +32,10 @@ func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
 	router.Use(static.Serve("/", themeFS))
 	router.NoRoute(func(c *gin.Context) {
 		c.Set(middleware.RouteTagKey, "web")
-		if strings.HasPrefix(c.Request.RequestURI, "/v1") || strings.HasPrefix(c.Request.RequestURI, "/api") || strings.HasPrefix(c.Request.RequestURI, "/assets") {
+		if !shouldServeIndexFallback(c.Request.URL.Path) {
+			c.Header("Cache-Control", "no-store, no-cache, must-revalidate, private, max-age=0")
+			c.Header("Pragma", "no-cache")
+			c.Header("Expires", "0")
 			controller.RelayNotFound(c)
 			return
 		}
@@ -43,4 +46,54 @@ func SetWebRouter(router *gin.Engine, assets ThemeAssets) {
 			c.Data(http.StatusOK, "text/html; charset=utf-8", assets.DefaultIndexPage)
 		}
 	})
+}
+
+func shouldServeIndexFallback(path string) bool {
+	nonPagePrefixes := []string{
+		"/v1",
+		"/api",
+		"/assets",
+		"/static",
+		"/@vite",
+		"/@react-refresh",
+		"/src",
+		"/node_modules",
+		"/.well-known",
+	}
+	for _, prefix := range nonPagePrefixes {
+		if path == prefix || strings.HasPrefix(path, prefix+"/") {
+			return false
+		}
+	}
+
+	lastSlash := strings.LastIndex(path, "/")
+	fileName := path
+	if lastSlash >= 0 {
+		fileName = path[lastSlash+1:]
+	}
+	dot := strings.LastIndex(fileName, ".")
+	if dot >= 0 {
+		switch strings.ToLower(fileName[dot:]) {
+		case ".css",
+			".gif",
+			".ico",
+			".jpeg",
+			".jpg",
+			".js",
+			".json",
+			".map",
+			".mjs",
+			".png",
+			".svg",
+			".ts",
+			".tsx",
+			".ttf",
+			".wasm",
+			".webp",
+			".woff",
+			".woff2":
+			return false
+		}
+	}
+	return true
 }
