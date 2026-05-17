@@ -16,21 +16,27 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useTranslation } from 'react-i18next'
-import { EXTERNAL_APP_URLS } from '@/lib/external-app-urls'
+import { type SVGProps } from 'react'
+import { cn } from '@/lib/utils'
 
-export type TopNavLink = {
-  title: string
-  href: string
-  disabled?: boolean
-  requiresAuth?: boolean
-  external?: boolean
-}
-
-export function useTopNavLinks(): TopNavLink[] {
-  const { t } = useTranslation()
-  return [
-    { title: t('Home'), href: '/' },
-    { title: t('Console'), href: EXTERNAL_APP_URLS.console, external: true },
-  ]
+export function SiteLogo({ className, ...props }: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      viewBox='0 0 32 32'
+      fill='none'
+      xmlns='http://www.w3.org/2000/svg'
+      className={cn('h-full w-full', className)}
+      {...props}
+    >
+      <path
+        d='M16 16C21 8 28 8 28 16C28 24 21 24 16 16C11 8 4 8 4 16C4 24 11 24 16 16Z'
+        stroke='currentColor'
+        strokeWidth='2.5'
+        strokeLinecap='round'
+        strokeLinejoin='round'
+      />
+      <circle cx='22' cy='16' r='2.5' fill='#4F46E5' />
+      <circle cx='10' cy='16' r='2.5' fill='#0EA5E9' />
+    </svg>
+  )
 }

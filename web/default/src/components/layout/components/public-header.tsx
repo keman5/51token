@@ -17,10 +17,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
-import { Code2 } from 'lucide-react'
+import { Link, useRouterState } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
+import { SiteLogo } from '@/assets/site-logo'
 import { useAuthStore } from '@/stores/auth-store'
+import { EXTERNAL_APP_URLS } from '@/lib/external-app-urls'
 import { cn } from '@/lib/utils'
 import { useNotifications } from '@/hooks/use-notifications'
 import { useSystemConfig } from '@/hooks/use-system-config'
@@ -67,12 +68,34 @@ export interface PublicHeaderProps {
   className?: string
 }
 
+function HeaderNotifications() {
+  const notifications = useNotifications()
+
+  return (
+    <>
+      <NotificationButton
+        unreadCount={notifications.unreadCount}
+        onClick={() => notifications.openDialog()}
+      />
+      <NotificationDialog
+        open={notifications.dialogOpen}
+        onOpenChange={notifications.setDialogOpen}
+        activeTab={notifications.activeTab}
+        onTabChange={notifications.setActiveTab}
+        notice={notifications.notice}
+        announcements={notifications.announcements}
+        loading={notifications.loading}
+        onCloseToday={notifications.closeToday}
+      />
+    </>
+  )
+}
+
 export function PublicHeader(props: PublicHeaderProps) {
   const {
     navLinks = defaultTopNavLinks,
     showThemeSwitch = true,
     showLanguageSwitcher = true,
-    logo: customLogo,
     siteName: customSiteName,
     homeUrl = '/',
     showAuthButtons = true,
@@ -80,8 +103,6 @@ export function PublicHeader(props: PublicHeaderProps) {
   } = props
 
   const { t } = useTranslation()
-  const navigate = useNavigate()
-  const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [authPromptTarget, setAuthPromptTarget] =
     useState<AuthPromptTarget | null>(null)
@@ -90,23 +111,16 @@ export function PublicHeader(props: PublicHeaderProps) {
   const { auth } = useAuthStore()
   const { systemName, loading } = useSystemConfig()
   const dynamicLinks = useTopNavLinks()
-  const notifications = useNotifications()
   const routerState = useRouterState()
   const pathname = routerState.location.pathname
 
   const user = auth.user
   const isAuthenticated = !!user
   const displaySiteName = customSiteName || systemName
+  const isBrandLoading = !customSiteName && loading
   const brandBaseName = displaySiteName.replace(/\s+Pro$/i, '')
   const showProSuffix = !/\s+Pro$/i.test(displaySiteName)
   const links = dynamicLinks.length > 0 ? dynamicLinks : navLinks
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20)
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
 
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? 'hidden' : ''
@@ -123,16 +137,15 @@ export function PublicHeader(props: PublicHeaderProps) {
     }, 1000)
 
     const timeoutId = window.setTimeout(() => {
-      const redirect = authPromptTarget.href
       setAuthPromptTarget(null)
-      navigate({ to: '/sign-in', search: { redirect } })
+      window.location.assign(EXTERNAL_APP_URLS.login)
     }, AUTH_PROMPT_SECONDS * 1000)
 
     return () => {
       window.clearInterval(intervalId)
       window.clearTimeout(timeoutId)
     }
-  }, [authPromptTarget, navigate])
+  }, [authPromptTarget])
 
   const closeAuthPrompt = useCallback(() => {
     setAuthPromptTarget(null)
@@ -140,10 +153,9 @@ export function PublicHeader(props: PublicHeaderProps) {
   }, [])
 
   const navigateToSignIn = useCallback(() => {
-    const redirect = authPromptTarget?.href || '/'
     setAuthPromptTarget(null)
-    navigate({ to: '/sign-in', search: { redirect } })
-  }, [authPromptTarget?.href, navigate])
+    window.location.assign(EXTERNAL_APP_URLS.login)
+  }, [])
 
   const handleNavLinkClick = useCallback(
     (
@@ -178,37 +190,17 @@ export function PublicHeader(props: PublicHeaderProps) {
 
   return (
     <>
-      <header className='pointer-events-none fixed inset-x-0 top-0 z-50'>
-        <div
-          className={cn(
-            'pointer-events-auto mx-auto transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]',
-            scrolled ? 'max-w-[52rem] px-3 pt-3' : 'max-w-7xl px-4 pt-0 md:px-6'
-          )}
-        >
-          <nav
-            className={cn(
-              'flex items-center justify-between transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]',
-              scrolled
-                ? 'bg-background/60 ring-border/50 h-12 rounded-2xl pr-1.5 pl-4 shadow-[0_2px_16px_-6px_rgba(0,0,0,0.08),0_0_0_0.5px_rgba(0,0,0,0.02)] ring-[0.5px] backdrop-blur-2xl dark:shadow-[0_2px_16px_-6px_rgba(0,0,0,0.4)]'
-                : 'h-16 px-2'
-            )}
-          >
+      <header className='glass-nav'>
+        <div className='container-main'>
+          <nav className='flex h-16 items-center justify-between'>
             {/* Logo */}
             <Link
               to={homeUrl}
               className='group flex shrink-0 items-center gap-2'
             >
-              <div className='bg-primary/20 text-primary border-primary/30 flex size-8 shrink-0 items-center justify-center rounded-lg border transition-all duration-300 group-hover:scale-105'>
-                {loading ? (
-                  <Skeleton className='size-full rounded-lg' />
-                ) : customLogo ? (
-                  customLogo
-                ) : (
-                  <Code2 className='size-5' />
-                )}
-              </div>
+              <SiteLogo className='size-8' />
               <span className='font-display text-xl font-bold tracking-tight'>
-                {loading ? (
+                {isBrandLoading ? (
                   <Skeleton className='h-5 w-24' />
                 ) : (
                   <>
@@ -230,13 +222,11 @@ export function PublicHeader(props: PublicHeaderProps) {
                     <a
                       key={i}
                       href={link.href}
-                      target='_blank'
-                      rel='noopener noreferrer'
                       aria-disabled={link.disabled}
                       tabIndex={link.disabled ? -1 : undefined}
                       onClick={(event) => handleNavLinkClick(event, link)}
                       className={cn(
-                        'text-muted-foreground hover:text-foreground rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors duration-200',
+                        'text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
                         link.disabled && 'pointer-events-none opacity-50'
                       )}
                     >
@@ -251,10 +241,10 @@ export function PublicHeader(props: PublicHeaderProps) {
                     disabled={link.disabled}
                     onClick={(event) => handleNavLinkClick(event, link)}
                     className={cn(
-                      'rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors duration-200',
+                      'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
                       isActive
-                        ? 'text-foreground'
-                        : 'text-muted-foreground hover:text-foreground',
+                        ? 'bg-accent text-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
                       link.disabled && 'pointer-events-none opacity-50'
                     )}
                   >
@@ -271,12 +261,7 @@ export function PublicHeader(props: PublicHeaderProps) {
 
               {showLanguageSwitcher && <LanguageSwitcher />}
               {showThemeSwitch && <ThemeSwitch />}
-              {showNotifications && (
-                <NotificationButton
-                  unreadCount={notifications.unreadCount}
-                  onClick={() => notifications.openDialog()}
-                />
-              )}
+              {showNotifications && <HeaderNotifications />}
 
               {showAuthButtons && (
                 <>
@@ -288,8 +273,8 @@ export function PublicHeader(props: PublicHeaderProps) {
                   ) : (
                     <Button
                       size='sm'
-                      className='h-8 rounded-lg px-3.5 text-xs font-medium'
-                      render={<Link to='/sign-in' />}
+                      className='bg-foreground text-background hover:bg-foreground h-8 rounded-lg px-4 text-sm font-medium shadow-[0_0_15px_color-mix(in_oklch,var(--primary)_20%,transparent)] hover:opacity-90'
+                      render={<a href={EXTERNAL_APP_URLS.login} />}
                     >
                       {t('Sign in')}
                     </Button>
@@ -367,8 +352,6 @@ export function PublicHeader(props: PublicHeaderProps) {
                   <a
                     key={i}
                     href={link.href}
-                    target='_blank'
-                    rel='noopener noreferrer'
                     aria-disabled={link.disabled}
                     tabIndex={link.disabled ? -1 : undefined}
                     onClick={(event) => handleNavLinkClick(event, link, true)}
@@ -404,13 +387,17 @@ export function PublicHeader(props: PublicHeaderProps) {
             style={{ transitionDelay: mobileOpen ? '250ms' : '0ms' }}
           >
             {showAuthButtons && (
-              <Link
-                to={isAuthenticated ? '/dashboard' : '/sign-in'}
+              <a
+                href={
+                  isAuthenticated
+                    ? EXTERNAL_APP_URLS.console
+                    : EXTERNAL_APP_URLS.login
+                }
                 onClick={() => setMobileOpen(false)}
                 className='bg-foreground text-background inline-flex h-10 items-center justify-center rounded-lg text-sm font-medium transition-opacity hover:opacity-90 active:opacity-80'
               >
                 {isAuthenticated ? t('Go to Dashboard') : t('Sign in')}
-              </Link>
+              </a>
             )}
           </div>
         </div>
@@ -446,20 +433,6 @@ export function PublicHeader(props: PublicHeaderProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Notification Dialog */}
-      {showNotifications && (
-        <NotificationDialog
-          open={notifications.dialogOpen}
-          onOpenChange={notifications.setDialogOpen}
-          activeTab={notifications.activeTab}
-          onTabChange={notifications.setActiveTab}
-          notice={notifications.notice}
-          announcements={notifications.announcements}
-          loading={notifications.loading}
-          onCloseToday={notifications.closeToday}
-        />
-      )}
     </>
   )
 }

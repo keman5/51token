@@ -98,6 +98,7 @@ const router = createRouter({
   context: { queryClient },
   defaultPreload: 'intent',
   defaultPreloadStaleTime: 0,
+  scrollRestoration: true,
 })
 
 // Register the router instance for type safety
@@ -113,12 +114,18 @@ const rootElement = document.getElementById('root')!
 ;(function initSystemBranding() {
   try {
     if (typeof window === 'undefined' || typeof document === 'undefined') return
+    const isStaticHome = window.location.pathname === '/'
     const apply = (name: string) => {
       document.title = name
       const metaTitle = document.querySelector(
         'meta[name="title"]'
       ) as HTMLMetaElement | null
       if (metaTitle) metaTitle.setAttribute('content', name)
+    }
+    if (isStaticHome) {
+      apply('51token')
+      applyFaviconToDom('/logo.svg')
+      return
     }
     // Cache-first
     try {

@@ -21,8 +21,8 @@ import { Link } from '@tanstack/react-router'
 import { ArrowRight, Terminal } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useTranslation } from 'react-i18next'
+import { EXTERNAL_APP_URLS } from '@/lib/external-app-urls'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
 
 interface HeroProps {
   className?: string
@@ -33,26 +33,26 @@ const snippets = {
   mac: `# macOS / Linux 环境设置命令
 
 # 临时设置 (当前终端有效)
-export OPENAI_API_BASE="https://51token.upit.top/51token/v1"
+export OPENAI_API_BASE="https://api.upit.top/51Token/v1"
 export OPENAI_API_KEY="sk-gw-xxxxxxxx"
 
 # 永久设置
-echo 'export OPENAI_API_BASE="https://51token.upit.top/51token/v1"' >> ~/.zshrc
+echo 'export OPENAI_API_BASE="https://api.upit.top/51Token/v1"' >> ~/.zshrc
 echo 'export OPENAI_API_KEY="sk-gw-xxxxxxxx"' >> ~/.zshrc
 source ~/.zshrc`,
   windows: `# Windows 环境设置命令 (cmd / powershell)
 
 # 临时设置 (当前控制台有效)
-set OPENAI_API_BASE=https://51token.upit.top/51token/v1
+set OPENAI_API_BASE=https://api.upit.top/51Token/v1
 set OPENAI_API_KEY=sk-gw-xxxxxxxx
 
 # 永久设置 (修改系统变量)
-setx OPENAI_API_BASE "https://51token.upit.top/51token/v1"
+setx OPENAI_API_BASE "https://api.upit.top/51Token/v1"
 setx OPENAI_API_KEY "sk-gw-xxxxxxxx"`,
   python: `import openai
 
 # 只需要修改两行代码，无缝切换至 Gateway
-openai.api_base = "https://51token.upit.top/51token/v1"
+openai.api_base = "https://api.upit.top/51Token/v1"
 openai.api_key = "sk-gw-xxxxxxxx"
 
 # 像往常一样发请求，内部自动映射加速
@@ -69,7 +69,6 @@ export function Hero(props: HeroProps) {
   const [activeTab, setActiveTab] = useState<'mac' | 'windows' | 'python'>(
     'mac'
   )
-  const ctaTarget = props.isAuthenticated ? '/dashboard' : '/sign-up'
 
   return (
     <section className='bg-background relative z-10 overflow-hidden pt-32 pb-20 md:pt-48 md:pb-32'>
@@ -107,25 +106,21 @@ export function Hero(props: HeroProps) {
             </p>
 
             <div className='flex flex-wrap gap-4'>
-              <Button
-                size='lg'
-                className='h-11 px-5'
-                render={<Link to={ctaTarget} />}
-              >
-                {props.isAuthenticated
-                  ? t('Go to Dashboard')
-                  : t('立即获取密钥')}
-                <ArrowRight className='size-4' />
-              </Button>
-              <Button
-                variant='outline'
-                size='lg'
-                className='h-11 px-5'
-                render={<Link to='/about' />}
-              >
+              {props.isAuthenticated ? (
+                <a href='#pricing' className='btn-primary'>
+                  {t('立即获取密钥')}
+                  <ArrowRight className='size-4' />
+                </a>
+              ) : (
+                <a href={EXTERNAL_APP_URLS.login} className='btn-primary'>
+                  {t('立即获取密钥')}
+                  <ArrowRight className='size-4' />
+                </a>
+              )}
+              <Link to='/about' className='btn-secondary'>
                 <Terminal className='size-4' />
                 {t('阅读文档')}
-              </Button>
+              </Link>
             </div>
           </motion.div>
 

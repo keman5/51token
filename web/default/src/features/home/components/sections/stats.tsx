@@ -16,69 +16,84 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback, useState } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
 import { useTranslation } from 'react-i18next'
 
 interface CounterProps {
   end: number
-  suffix?: string
-  prefix?: string
   duration?: number
   decimals?: number
+  formatter?: (value: number) => string
 }
 
 function Counter(props: CounterProps) {
-  const { end, suffix = '', prefix = '', duration = 1600, decimals = 0 } = props
+  const { end, duration = 1000, decimals = 0, formatter } = props
   const ref = useRef<HTMLSpanElement>(null)
   const startedRef = useRef(false)
+  const [displayValue, setDisplayValue] = useState(
+    formatter ? formatter(0) : decimals > 0 ? (0).toFixed(decimals) : '0'
+  )
 
   const formatValue = useCallback(
-    (v: number) =>
-      decimals > 0 ? v.toFixed(decimals) : Math.round(v).toLocaleString(),
-    [decimals]
+    (v: number) => {
+      if (formatter) return formatter(v)
+      const value =
+        decimals > 0 ? v.toFixed(decimals) : Math.round(v).toLocaleString()
+      return value
+    },
+    [decimals, formatter]
   )
 
   const animate = useCallback(() => {
-    const el = ref.current
-    if (!el) return
     const start = performance.now()
     const step = (now: number) => {
       const progress = Math.min((now - start) / duration, 1)
       const eased = 1 - Math.pow(1 - progress, 3)
-      el.textContent = `${prefix}${formatValue(eased * end)}${suffix}`
+      setDisplayValue(formatValue(eased * end))
       if (progress < 1) requestAnimationFrame(step)
     }
     requestAnimationFrame(step)
-  }, [end, duration, prefix, suffix, formatValue])
+  }, [end, duration, formatValue])
 
   useEffect(() => {
-    const el = ref.current
-    if (!el) return
-
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
     if (mq.matches) {
-      el.textContent = `${prefix}${formatValue(end)}${suffix}`
+      setDisplayValue(formatValue(end))
       return
     }
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !startedRef.current) {
-          startedRef.current = true
-          animate()
-          observer.unobserve(el)
-        }
-      },
-      { threshold: 0.5 }
-    )
-
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [animate, end, prefix, suffix, formatValue])
+    if (!startedRef.current) {
+      startedRef.current = true
+      animate()
+    }
+  }, [animate, end, formatValue])
 
   return (
-    <span ref={ref} className='tabular-nums'>
-      {prefix}0{suffix}
+    <span
+      ref={ref}
+      className='inline-flex min-h-[1.1em] max-w-full items-baseline justify-center overflow-hidden tabular-nums'
+      aria-label={displayValue}
+    >
+      {Array.from(displayValue).map((char, index) => (
+        <span
+          key={`${index}-${char}`}
+          className='relative inline-block h-[1.1em] shrink-0 overflow-hidden'
+        >
+          <AnimatePresence mode='popLayout' initial={false}>
+            <motion.span
+              key={char}
+              initial={{ y: '80%', rotateX: -80, opacity: 0 }}
+              animate={{ y: 0, rotateX: 0, opacity: 1 }}
+              exit={{ y: '-80%', rotateX: 80, opacity: 0 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              className='block min-w-[0.55em]'
+            >
+              {char}
+            </motion.span>
+          </AnimatePresence>
+        </span>
+      ))}
     </span>
   )
 }
@@ -88,38 +103,67 @@ interface StatsProps {
 }
 
 interface StatItem {
-  end: number
-  suffix: string
+  end?: number
+  unit?: string
   label: string
   decimals?: number
+  formatter?: (value: number) => string
+  value?: string
 }
 
 export function Stats(_props: StatsProps) {
   const { t } = useTranslation()
 
   const stats: StatItem[] = [
-    { end: 99.9, suffix: '%', label: t('服务可用性'), decimals: 1 },
-    { end: 50, suffix: 'ms', label: t('平均转发延迟') },
-    { end: 100, suffix: '+', label: t('支持模型与渠道') },
-    { end: 24, suffix: '/7', label: t('全天候资源调度') },
+    { end: 99.9, unit: '%', label: t('服务可用性'), decimals: 1 },
+    {
+      end: 120_000_000,
+      unit: t('亿次'),
+      label: t('累计处理请求'),
+      formatter: (value) => (value / 100_000_000).toFixed(1),
+    },
+    { value: 'ChatGPT', label: t('专业稳定 Codex') },
+    { end: 24, unit: '/7', label: t('全天候资源调度') },
+    { end: 365, unit: t('天+'), label: t('已稳定运行时长') },
   ]
 
   return (
-    <section className='border-border/60 bg-muted/20 relative z-10 border-y'>
-      <div className='container-main py-10 md:py-12'>
-        <div className='grid grid-cols-2 gap-8 md:grid-cols-4 md:gap-12'>
-          {stats.map((s) => (
-            <div
+    <section className='border-border-light bg-background relative z-10 overflow-hidden border-y py-16 md:py-20'>
+      <div
+        aria-hidden
+        className="absolute inset-0 bg-[url('https://transparenttextures.com/patterns/cubes.png')] opacity-5"
+      />
+      <div className='container-main relative z-10'>
+        <div className='grid w-full grid-cols-2 gap-y-8 md:grid-cols-5 md:gap-y-0'>
+          {stats.map((s, index) => (
+            <motion.div
               key={s.label}
-              className='flex flex-col items-center text-center'
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: index * 0.1 }}
+              className='border-border flex w-full min-w-0 flex-col items-center justify-center overflow-hidden px-4 text-center md:border-l md:px-6 md:first:border-l-0'
             >
-              <span className='text-foreground text-3xl font-bold tracking-tight md:text-4xl'>
-                <Counter end={s.end} suffix={s.suffix} decimals={s.decimals} />
+              <span className='text-foreground font-display inline-flex max-w-full items-baseline justify-center overflow-hidden text-4xl font-bold tracking-tight whitespace-nowrap md:text-5xl'>
+                {s.value ? (
+                  s.value
+                ) : (
+                  <Counter
+                    end={s.end ?? 0}
+                    decimals={s.decimals}
+                    formatter={s.formatter}
+                  />
+                )}
+                {s.unit && (
+                  <span className='text-muted-foreground ml-1 text-[0.55em] font-medium tracking-normal'>
+                    {s.unit}
+                  </span>
+                )}
               </span>
-              <span className='text-muted-foreground mt-2 text-sm'>
+              <span className='text-muted-foreground mt-2 block text-sm font-medium md:text-base'>
                 {s.label}
               </span>
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>

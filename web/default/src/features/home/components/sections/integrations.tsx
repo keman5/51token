@@ -32,7 +32,7 @@ const tabs = [
 const snippets = {
   python: `import openai
 
-openai.api_base = "https://51token.upit.top/51token/v1"
+openai.api_base = "https://api.upit.top/51Token/v1"
 openai.api_key = "sk-gw-xxxxxxxxxxxxxxxx"
 
 response = openai.ChatCompletion.create(
@@ -49,7 +49,7 @@ for chunk in response:
 
 const configuration = new Configuration({
   apiKey: "sk-gw-xxxxxxxxxxxxxxxx",
-  basePath: "https://51token.upit.top/51token/v1",
+  basePath: "https://api.upit.top/51Token/v1",
 });
 
 const openai = new OpenAIApi(configuration);
@@ -57,8 +57,10 @@ const openai = new OpenAIApi(configuration);
 const completion = await openai.createChatCompletion({
   model: "codex-pro",
   messages: [{ role: "user", content: "Optimize this algorithm..." }],
-});`,
-  curl: `curl https://51token.upit.top/51token/v1/chat/completions \\
+});
+
+console.log(completion.data.choices[0].message);`,
+  curl: `curl https://api.upit.top/51Token/v1/chat/completions \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer sk-gw-xxxxxxxxxxxxxxxx" \\
   -d '{
@@ -69,12 +71,13 @@ const completion = await openai.createChatCompletion({
 from langchain.schema import HumanMessage
 
 chat = ChatOpenAI(
-    openai_api_base="https://51token.upit.top/51token/v1",
+    openai_api_base="https://api.upit.top/51Token/v1",
     openai_api_key="sk-gw-xxxxxxxxxxxxxxxx",
     model_name="codex-pro"
 )
 
-response = chat([HumanMessage(content="Explain quantum computing.")])`,
+response = chat([HumanMessage(content="Explain quantum computing.")])
+print(response.content)`,
 }
 
 export function Integrations() {
@@ -91,14 +94,14 @@ export function Integrations() {
   return (
     <section className='bg-background border-border/60 relative overflow-hidden border-t py-24'>
       <div className='container-main relative z-10'>
-        <div className='grid items-center gap-14 lg:grid-cols-2'>
+        <div className='grid items-center gap-16 lg:grid-cols-2'>
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.45 }}
           >
-            <h2 className='text-foreground mb-6 text-3xl font-bold tracking-tight md:text-4xl'>
+            <h2 className='text-foreground font-display mb-6 text-3xl font-bold tracking-tight md:text-4xl'>
               {t('两行代码')}
               <br />
               {t('完成底层架构平替')}
@@ -127,8 +130,8 @@ export function Integrations() {
             viewport={{ once: true }}
             transition={{ duration: 0.45 }}
           >
-            <div className='panel-card bg-background/70 overflow-hidden shadow-2xl backdrop-blur-md'>
-              <div className='bg-muted/30 border-border no-scrollbar flex overflow-x-auto border-b px-4'>
+            <div className='panel-card bg-background/50 overflow-hidden shadow-2xl backdrop-blur-md'>
+              <div className='bg-muted/30 border-border hide-scrollbar flex overflow-x-auto border-b px-4'>
                 {tabs.map((tab) => (
                   <button
                     key={tab.id}
@@ -145,7 +148,7 @@ export function Integrations() {
                 ))}
               </div>
               <div className='w-full overflow-x-auto p-6'>
-                <pre className='font-mono text-sm leading-relaxed whitespace-pre-wrap'>
+                <pre className='font-mono text-sm leading-relaxed break-all whitespace-pre-wrap'>
                   <code className='text-foreground/90'>
                     {snippets[activeTab]}
                   </code>

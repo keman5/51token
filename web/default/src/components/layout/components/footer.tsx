@@ -16,7 +16,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useMemo } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
@@ -57,7 +56,7 @@ function FooterLinkItem(props: { link: FooterLink }) {
         href={props.link.href}
         target='_blank'
         rel='noopener noreferrer'
-        className='text-muted-foreground hover:text-foreground text-sm transition-colors duration-200'
+        className='text-muted-foreground hover:text-primary text-sm transition-colors'
       >
         {label}
       </a>
@@ -67,7 +66,7 @@ function FooterLinkItem(props: { link: FooterLink }) {
   return (
     <Link
       to={props.link.href}
-      className='text-muted-foreground hover:text-foreground text-sm transition-colors duration-200'
+      className='text-muted-foreground hover:text-primary text-sm transition-colors'
     >
       {label}
     </Link>
@@ -82,12 +81,10 @@ function ProjectAttribution(props: { currentYear: number }) {
       <span className='text-muted-foreground/45'>
         &copy; {props.currentYear}{' '}
         <a
-          href='https://github.com/QuantumNous/new-api'
-          target='_blank'
           rel='noopener noreferrer'
           className='text-foreground/70 hover:text-foreground font-medium transition-colors'
         >
-          {t('New API')}
+          51Token Power
         </a>
         . {t(NEW_API_FOOTER_ATTRIBUTION_KEY)}
       </span>
@@ -95,76 +92,47 @@ function ProjectAttribution(props: { currentYear: number }) {
   )
 }
 
+function SystemStatusIndicator() {
+  const { t } = useTranslation()
+
+  return (
+    <div className='text-muted-foreground/55 flex items-center gap-1.5 text-[11px]'>
+      <span className='live-indicator-dot scale-75 shadow-[0_0_6px_color-mix(in_oklch,var(--success)_35%,transparent)]' />
+      {t('所有系统运行正常')}
+    </div>
+  )
+}
+
 export function Footer(props: FooterProps) {
   const { t } = useTranslation()
-  const {
-    systemName,
-    logo: systemLogo,
-    footerHtml,
-    demoSiteEnabled,
-  } = useSystemConfig()
+  const { systemName, footerHtml } = useSystemConfig()
 
-  const displayLogo = systemLogo || props.logo || '/logo.png'
-  const displayName = systemName || props.name || 'New API'
-  const isDemoSiteMode = Boolean(demoSiteEnabled)
+  const displayName = props.name || systemName || 'New API'
+  const brandName = /\s+Pro$/i.test(displayName)
+    ? displayName
+    : `${displayName} Pro`
   const currentYear = new Date().getFullYear()
 
-  const fallbackColumns = useMemo<FooterColumnProps[]>(
-    () => [
-      {
-        title: t('footer.columns.about.title'),
-        links: [
-          {
-            text: t('footer.columns.about.links.aboutProject'),
-            href: 'https://docs.newapi.pro/wiki/project-introduction/',
-          },
-          {
-            text: t('footer.columns.about.links.contact'),
-            href: 'https://docs.newapi.pro/support/community-interaction/',
-          },
-          {
-            text: t('footer.columns.about.links.features'),
-            href: 'https://docs.newapi.pro/wiki/features-introduction/',
-          },
-        ],
-      },
-      {
-        title: t('footer.columns.docs.title'),
-        links: [
-          {
-            text: t('footer.columns.docs.links.quickStart'),
-            href: 'https://docs.newapi.pro/getting-started/',
-          },
-          {
-            text: t('footer.columns.docs.links.installation'),
-            href: 'https://docs.newapi.pro/installation/',
-          },
-          {
-            text: t('footer.columns.docs.links.apiDocs'),
-            href: 'https://docs.newapi.pro/api/',
-          },
-        ],
-      },
-      {
-        title: t('footer.columns.related.title'),
-        links: [
-          {
-            text: t('footer.columns.related.links.oneApi'),
-            href: 'https://github.com/songquanpeng/one-api',
-          },
-          {
-            text: t('footer.columns.related.links.midjourney'),
-            href: 'https://github.com/novicezk/midjourney-proxy',
-          },
-          {
-            text: t('footer.columns.related.links.newApiKeyTool'),
-            href: 'https://github.com/Calcium-Ion/new-api-key-tool',
-          },
-        ],
-      },
-    ],
-    [t]
-  )
+  const fallbackColumns: FooterColumnProps[] = [
+    {
+      title: t('资源'),
+      links: [
+        { text: t('API 文档'), href: 'https://docs.newapi.pro/api/' },
+        {
+          text: t('开发指南'),
+          href: 'https://docs.newapi.pro/getting-started/',
+        },
+        { text: t('系统状态'), href: '/about' },
+      ],
+    },
+    {
+      title: t('法律'),
+      links: [
+        { text: t('服务条款'), href: '/about' },
+        { text: t('隐私政策'), href: '/privacy-policy' },
+      ],
+    },
+  ]
 
   const displayColumns = props.columns ?? fallbackColumns
 
@@ -178,12 +146,12 @@ export function Footer(props: FooterProps) {
       >
         <div className='mx-auto w-full max-w-6xl px-6 py-5'>
           <div className='bg-muted/20 border-border/50 flex flex-col items-center justify-between gap-4 rounded-2xl border px-4 py-4 backdrop-blur-sm sm:flex-row sm:px-5'>
-            <div
-              className='custom-footer text-muted-foreground min-w-0 text-center text-sm sm:text-left'
-              dangerouslySetInnerHTML={{ __html: footerHtml }}
-            />
+            <div className='min-w-0 flex-1' aria-hidden='true' />
             <div className='border-border/60 w-full border-t pt-4 sm:w-auto sm:border-t-0 sm:border-l sm:pt-0 sm:pl-5'>
-              <ProjectAttribution currentYear={currentYear} />
+              <div className='flex flex-col items-center gap-2 sm:items-end'>
+                <SystemStatusIndicator />
+                <ProjectAttribution currentYear={currentYear} />
+              </div>
             </div>
           </div>
         </div>
@@ -193,55 +161,49 @@ export function Footer(props: FooterProps) {
 
   return (
     <footer
-      className={cn('border-border/40 relative z-10 border-t', props.className)}
+      className={cn(
+        'border-border-light bg-background relative z-10 border-t py-12 md:py-16',
+        props.className
+      )}
     >
-      <div className='mx-auto max-w-6xl px-6 py-12 md:py-16'>
-        <div className='flex flex-col justify-between gap-10 md:flex-row md:gap-16'>
-          {/* Brand column */}
-          <div className='shrink-0'>
-            <Link to='/' className='group flex items-center gap-2.5'>
-              <img
-                src={displayLogo}
-                alt={displayName}
-                className='size-7 rounded-lg object-contain'
-              />
-              <span className='text-sm font-semibold tracking-tight'>
-                {displayName}
-              </span>
+      <div className='container-main'>
+        <div className='mb-12 grid grid-cols-2 gap-8 md:grid-cols-4'>
+          <div className='col-span-2'>
+            <Link
+              to='/'
+              className='text-foreground font-display mb-4 block text-lg font-bold tracking-tight'
+            >
+              {brandName}
             </Link>
-            <p className='text-muted-foreground/60 mt-3 max-w-[200px] text-xs leading-relaxed'>
-              {t('Powerful API Management Platform')}
+            <p className='text-muted-foreground max-w-xs text-sm'>
+              {t(
+                '高性能 AI 接口分发基础设施。无缝兼容 OpenAI 接口规范，专注于 Codex Pro 账号额度的高效、安全、稳定分发。'
+              )}
             </p>
           </div>
 
-          {/* Links columns */}
-          {isDemoSiteMode && (
-            <div className='grid grid-cols-3 gap-8 md:gap-16'>
-              {displayColumns.map((column, index) => (
-                <div key={index}>
-                  <p className='text-muted-foreground/50 mb-3 text-xs font-medium tracking-wider uppercase'>
-                    {t(column.title)}
-                  </p>
-                  <ul className='space-y-2.5'>
-                    {column.links.map((link, linkIndex) => (
-                      <li key={linkIndex}>
-                        <FooterLinkItem link={link} />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+          {displayColumns.map((column) => (
+            <div key={column.title}>
+              <h4 className='text-foreground mb-4 font-medium'>
+                {t(column.title)}
+              </h4>
+              <ul className='text-muted-foreground space-y-2 text-sm'>
+                {column.links.map((link) => (
+                  <li key={link.href}>
+                    <FooterLinkItem link={link} />
+                  </li>
+                ))}
+              </ul>
             </div>
-          )}
+          ))}
         </div>
 
-        {/* Bottom section */}
-        <div className='border-border/30 mt-12 flex flex-col items-center justify-between gap-3 border-t pt-6 sm:flex-row'>
-          <p className='text-muted-foreground/40 text-xs'>
-            &copy; {currentYear} {displayName}.{' '}
-            {props.copyright ?? t('footer.defaultCopyright')}
-          </p>
-          <ProjectAttribution currentYear={currentYear} />
+        <div className='border-border text-muted-foreground flex flex-col items-center justify-between gap-4 border-t pt-8 text-xs md:flex-row'>
+          <div className='hidden md:block' aria-hidden='true' />
+          <div className='flex flex-col items-center gap-2 md:items-end'>
+            <SystemStatusIndicator />
+            <ProjectAttribution currentYear={currentYear} />
+          </div>
         </div>
       </div>
     </footer>
