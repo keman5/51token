@@ -44,7 +44,10 @@ export function NotificationButton({
         variant='ghost'
         size='icon'
         onClick={onClick}
-        className={cn('h-9 w-9', className)}
+        className={cn(
+          'text-muted-foreground hover:text-foreground hover:bg-accent h-8 w-8 rounded-full transition-colors',
+          className
+        )}
         aria-label={t('Notifications')}
       >
         <Bell className='size-[1.2rem]' />

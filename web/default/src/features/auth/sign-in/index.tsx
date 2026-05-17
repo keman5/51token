@@ -17,8 +17,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Link, useSearch } from '@tanstack/react-router'
+import { ArrowLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { EXTERNAL_APP_URLS } from '@/lib/external-app-urls'
+import { cn } from '@/lib/utils'
 import { useStatus } from '@/hooks/use-status'
+import { buttonVariants } from '@/components/ui/button'
 import { AuthLayout } from '../auth-layout'
 import { TermsFooter } from '../components/terms-footer'
 import { UserAuthForm } from './components/user-auth-form'
@@ -32,18 +36,28 @@ export function SignIn() {
     <AuthLayout>
       <div className='w-full space-y-8'>
         <div className='space-y-2'>
+          <Link
+            to='/'
+            className={cn(
+              buttonVariants({ variant: 'ghost', size: 'sm' }),
+              'text-muted-foreground mb-2 -ml-2 w-fit'
+            )}
+          >
+            <ArrowLeft className='size-4' />
+            {t('Back to Home')}
+          </Link>
           <h2 className='text-center text-2xl font-semibold tracking-tight sm:text-left'>
             {t('Sign in')}
           </h2>
           {!status?.self_use_mode_enabled && (
             <p className='text-muted-foreground text-left text-sm sm:text-base'>
               {t("Don't have an account?")}{' '}
-              <Link
-                to='/sign-up'
+              <a
+                href={EXTERNAL_APP_URLS.register}
                 className='hover:text-primary font-medium underline underline-offset-4'
               >
                 {t('Sign up')}
-              </Link>
+              </a>
               .
             </p>
           )}
