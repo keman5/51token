@@ -20,6 +20,10 @@ For commercial licensing, please contact support@quantumnous.com
 
 @theme inline {
   --font-sans: 'Public Sans', sans-serif;
+  --font-display: 'Space Grotesk', 'Public Sans', sans-serif;
+  --font-mono:
+    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace;
   --font-inter:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
     'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;

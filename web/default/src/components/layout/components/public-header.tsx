@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
+import { Code2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
@@ -41,7 +42,6 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { defaultTopNavLinks } from '../config/top-nav.config'
 import type { TopNavLink } from '../types'
-import { HeaderLogo } from './header-logo'
 
 const AUTH_PROMPT_SECONDS = 5
 
@@ -88,12 +88,7 @@ export function PublicHeader(props: PublicHeaderProps) {
   const [authPromptSecondsLeft, setAuthPromptSecondsLeft] =
     useState(AUTH_PROMPT_SECONDS)
   const { auth } = useAuthStore()
-  const {
-    systemName,
-    logo: systemLogo,
-    loading,
-    logoLoaded,
-  } = useSystemConfig()
+  const { systemName, loading } = useSystemConfig()
   const dynamicLinks = useTopNavLinks()
   const notifications = useNotifications()
   const routerState = useRouterState()
@@ -102,6 +97,8 @@ export function PublicHeader(props: PublicHeaderProps) {
   const user = auth.user
   const isAuthenticated = !!user
   const displaySiteName = customSiteName || systemName
+  const brandBaseName = displaySiteName.replace(/\s+Pro$/i, '')
+  const showProSuffix = !/\s+Pro$/i.test(displaySiteName)
   const links = dynamicLinks.length > 0 ? dynamicLinks : navLinks
 
   useEffect(() => {
@@ -199,24 +196,28 @@ export function PublicHeader(props: PublicHeaderProps) {
             {/* Logo */}
             <Link
               to={homeUrl}
-              className='group flex shrink-0 items-center gap-2.5'
+              className='group flex shrink-0 items-center gap-2'
             >
-              <div className='flex size-7 shrink-0 items-center justify-center transition-all duration-300 group-hover:scale-105'>
+              <div className='bg-primary/20 text-primary border-primary/30 flex size-8 shrink-0 items-center justify-center rounded-lg border transition-all duration-300 group-hover:scale-105'>
                 {loading ? (
                   <Skeleton className='size-full rounded-lg' />
                 ) : customLogo ? (
                   customLogo
                 ) : (
-                  <HeaderLogo
-                    src={systemLogo}
-                    loading={loading}
-                    logoLoaded={logoLoaded}
-                    className='size-full rounded-lg object-contain'
-                  />
+                  <Code2 className='size-5' />
                 )}
               </div>
-              <span className='text-sm font-semibold tracking-tight'>
-                {loading ? <Skeleton className='h-4 w-16' /> : displaySiteName}
+              <span className='font-display text-xl font-bold tracking-tight'>
+                {loading ? (
+                  <Skeleton className='h-5 w-24' />
+                ) : (
+                  <>
+                    {brandBaseName}{' '}
+                    {showProSuffix && (
+                      <span className='text-primary/90'>Pro</span>
+                    )}
+                  </>
+                )}
               </span>
             </Link>
 

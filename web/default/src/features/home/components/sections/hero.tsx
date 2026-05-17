@@ -30,24 +30,32 @@ interface HeroProps {
 }
 
 const snippets = {
-  mac: `# macOS / Linux
+  mac: `# macOS / Linux 环境设置命令
+
+# 临时设置 (当前终端有效)
 export OPENAI_API_BASE="https://51token.upit.top/51token/v1"
 export OPENAI_API_KEY="sk-gw-xxxxxxxx"
 
+# 永久设置
 echo 'export OPENAI_API_BASE="https://51token.upit.top/51token/v1"' >> ~/.zshrc
 echo 'export OPENAI_API_KEY="sk-gw-xxxxxxxx"' >> ~/.zshrc
 source ~/.zshrc`,
-  windows: `# Windows cmd / powershell
+  windows: `# Windows 环境设置命令 (cmd / powershell)
+
+# 临时设置 (当前控制台有效)
 set OPENAI_API_BASE=https://51token.upit.top/51token/v1
 set OPENAI_API_KEY=sk-gw-xxxxxxxx
 
+# 永久设置 (修改系统变量)
 setx OPENAI_API_BASE "https://51token.upit.top/51token/v1"
 setx OPENAI_API_KEY "sk-gw-xxxxxxxx"`,
   python: `import openai
 
+# 只需要修改两行代码，无缝切换至 Gateway
 openai.api_base = "https://51token.upit.top/51token/v1"
 openai.api_key = "sk-gw-xxxxxxxx"
 
+# 像往常一样发请求，内部自动映射加速
 response = openai.ChatCompletion.create(
   model="codex-pro",
   messages=[{"role": "user", "content": "写一个快排算法"}]
@@ -64,14 +72,14 @@ export function Hero(props: HeroProps) {
   const ctaTarget = props.isAuthenticated ? '/dashboard' : '/sign-up'
 
   return (
-    <section className='bg-background relative z-10 overflow-hidden pt-32 pb-20 md:pt-44 md:pb-28'>
+    <section className='bg-background relative z-10 overflow-hidden pt-32 pb-20 md:pt-48 md:pb-32'>
       <div
         aria-hidden
-        className='bg-primary/8 pointer-events-none absolute top-1/2 left-1/2 -z-10 h-[24rem] w-[48rem] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl'
+        className='bg-primary/10 pointer-events-none absolute top-1/2 left-1/2 -z-10 h-[400px] w-[800px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[120px]'
       />
 
       <div className='container-main relative z-10'>
-        <div className='grid items-center gap-12 lg:grid-cols-2 lg:gap-10'>
+        <div className='grid items-center gap-12 lg:grid-cols-2 lg:gap-8'>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -86,7 +94,7 @@ export function Hero(props: HeroProps) {
               {t('Codex Pro 资源共享现已就绪')}
             </div>
 
-            <h1 className='mb-6 text-4xl leading-tight font-bold tracking-tight md:text-5xl lg:text-6xl'>
+            <h1 className='font-display mb-6 text-4xl leading-tight font-bold tracking-tight md:text-5xl lg:text-6xl'>
               {t('极致高效的')}
               <br />
               <span className='text-gradient-main'>{t('AI 接口分发网关')}</span>
@@ -127,6 +135,10 @@ export function Hero(props: HeroProps) {
             transition={{ duration: 0.5, delay: 0.12 }}
             className='relative w-full'
           >
+            <div
+              aria-hidden
+              className='from-primary/10 pointer-events-none absolute inset-0 -z-10 bg-gradient-to-tr via-transparent to-cyan-500/10 blur-3xl'
+            />
             <div className='panel-card bg-background/80 overflow-hidden shadow-2xl backdrop-blur-xl'>
               <div className='bg-muted/30 border-border flex items-center justify-between border-b px-4'>
                 <div className='flex gap-2 py-4'>
@@ -158,7 +170,7 @@ export function Hero(props: HeroProps) {
                 </div>
               </div>
               <div className='flex min-h-[18rem] w-full items-center overflow-x-auto p-5 sm:p-6'>
-                <pre className='font-mono text-sm leading-relaxed whitespace-pre-wrap'>
+                <pre className='font-mono text-sm leading-relaxed break-all whitespace-pre-wrap'>
                   <code className='text-foreground/90'>
                     {snippets[activeTab]}
                   </code>
