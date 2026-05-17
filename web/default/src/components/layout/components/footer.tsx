@@ -48,14 +48,15 @@ const NEW_API_FOOTER_ATTRIBUTION_KEY = [
 function FooterLinkItem(props: { link: FooterLink }) {
   const { t } = useTranslation()
   const isExternal = props.link.href.startsWith('http')
+  const isAnchor = props.link.href.startsWith('#')
   const label = t(props.link.text)
 
-  if (isExternal) {
+  if (isExternal || isAnchor) {
     return (
       <a
         href={props.link.href}
-        target='_blank'
-        rel='noopener noreferrer'
+        target={isExternal ? '_blank' : undefined}
+        rel={isExternal ? 'noopener noreferrer' : undefined}
         className='text-muted-foreground hover:text-primary text-sm transition-colors'
       >
         {label}
@@ -162,7 +163,7 @@ export function Footer(props: FooterProps) {
   return (
     <footer
       className={cn(
-        'border-border-light bg-background relative z-10 border-t py-12 md:py-16',
+        'border-border-light bg-background relative z-10 border-t py-10 md:py-12',
         props.className
       )}
     >

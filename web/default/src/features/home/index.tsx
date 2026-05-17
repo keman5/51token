@@ -20,8 +20,28 @@ import { SiteLogo } from '@/assets/site-logo'
 import { useAuthStore } from '@/stores/auth-store'
 import { PublicLayout } from '@/components/layout'
 import { Footer } from '@/components/layout/components/footer'
+import { EXTERNAL_APP_URLS } from '@/lib/external-app-urls'
 import { FAQ, Features, Hero, Integrations, Pricing, Stats } from './components'
 import { useHomeScrollRestoration } from './hooks'
+
+const homeFooterColumns = [
+  {
+    title: '资源',
+    links: [
+      { text: '套餐价格', href: '#pricing' },
+      { text: '接入示例', href: '#integrations' },
+      { text: '系统状态', href: EXTERNAL_APP_URLS.console },
+    ],
+  },
+  {
+    title: '入口',
+    links: [
+      { text: '登录', href: EXTERNAL_APP_URLS.login },
+      { text: '注册', href: EXTERNAL_APP_URLS.register },
+      { text: '控制台', href: EXTERNAL_APP_URLS.console },
+    ],
+  },
+]
 
 export function Home() {
   const { auth } = useAuthStore()
@@ -35,14 +55,18 @@ export function Home() {
       showNotifications={false}
       logo={<SiteLogo className='size-5' />}
       siteName='51token'
+      navLinks={[
+        { title: '主页', href: '/' },
+        { title: '控制台', href: EXTERNAL_APP_URLS.console, external: true },
+      ]}
     >
       <Hero isAuthenticated={isAuthenticated} />
       <Stats />
+      <Pricing isAuthenticated={isAuthenticated} />
       <Features />
       <Integrations />
-      <Pricing isAuthenticated={isAuthenticated} />
       <FAQ />
-      <Footer name='51token' />
+      <Footer name='51token' columns={homeFooterColumns} />
     </PublicLayout>
   )
 }

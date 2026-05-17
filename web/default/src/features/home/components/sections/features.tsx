@@ -96,7 +96,7 @@ export function Features(_props: FeaturesProps) {
   ]
 
   return (
-    <section className='bg-background relative overflow-hidden py-24'>
+    <section className='border-border-light bg-background relative overflow-hidden border-t py-16 md:py-20'>
       <div
         aria-hidden
         className='bg-primary/5 pointer-events-none absolute top-0 right-0 size-[36rem] translate-x-1/3 -translate-y-1/3 rounded-full blur-3xl'

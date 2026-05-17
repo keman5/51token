@@ -35,11 +35,10 @@ export function Pricing(props: PricingProps) {
     {
       name: t('基础开发者'),
       price: '80',
-      frequency: t('/ 包'),
+      frequency: t('/ 个'),
       description: t('适用于个人开发者测试与小规模内部系统接入。'),
       features: [
-        // 5600万 Tokens
-        t('$112 固定额度'),
+        t('$500 固定额度'),
         t('不限使用时间，用完即止'),
         t('共享 Codex 基础速率'),
         t('基础并发限流 (3次/秒)'),
@@ -53,11 +52,11 @@ export function Pricing(props: PricingProps) {
     {
       name: t('Plus 资源合租'),
       price: '120',
-      frequency: t('/ 包'),
+      frequency: t('/ 个'),
       description: t('独立团队或中小型企业，平摊高昂的 Plus 账号费用。'),
       features: [
-        t('约 $180 参考额度'),
-        t('按官方 5 小时限额与日限额同步使用'),
+        t('$850 固定额度'),
+        t('不限使用时间，用完即止'),
         t('独享或少量共享的 Plus 级速率'),
         t('放宽并发限制 (20次/秒)'),
         t('专属加速通道与高可用路由'),
@@ -71,12 +70,11 @@ export function Pricing(props: PricingProps) {
     {
       name: t('Pro 资源合租'),
       price: '400',
-      frequency: t('/ 月'),
+      frequency: t('/ 个'),
       description: t('为高端业务场景定制，提供无缝的 Pro 层级极致体验。'),
       features: [
-        // 约 3亿 Tokens
-        t('约 $600 参考额度'),
-        t('按官方 5 小时限额与周限额使用'),
+        t('$2500 固定额度'),
+        t('按官方 5 小时限额与周限额同步使用'),
         t('独享或高级优化的 Pro 级速率'),
         t('极致并发与极低延迟节点'),
         t('专用 API 域名与独立网关'),
@@ -92,43 +90,37 @@ export function Pricing(props: PricingProps) {
     {
       name: t('1日小包'),
       price: '5',
-      // 800万 Tokens
-      tokens: t('$16 额度'),
+      tokens: t('$33 额度'),
       equivalent: t('适合轻量测试与临时验证'),
     },
     {
       name: t('1日中包'),
       price: '15',
-      // 2500万 Tokens
-      tokens: t('$50 额度'),
+      tokens: t('$100 额度'),
       equivalent: t('适合一天内集中开发调试'),
     },
     {
       name: t('1日大包'),
       price: '30',
-      // 6000万 Tokens
-      tokens: t('$120 额度'),
+      tokens: t('$200 额度'),
       equivalent: t('适合短期演示与高频测试'),
     },
     {
       name: t('1周小包'),
       price: '35',
-      // 5000万 Tokens
-      tokens: t('$100 额度'),
+      tokens: t('$233 额度'),
       equivalent: t('适合一周内低频稳定使用'),
     },
     {
       name: t('1周中包'),
       price: '84',
-      // 1.5亿 Tokens
-      tokens: t('$300 额度'),
+      tokens: t('$560 额度'),
       equivalent: t('适合小团队阶段性开发'),
     },
     {
       name: t('1周大包'),
       price: '168',
-      // 3.5亿 Tokens
-      tokens: t('$700 额度'),
+      tokens: t('$1120 额度'),
       equivalent: t('适合高频开发与项目冲刺'),
     },
   ]
@@ -136,7 +128,7 @@ export function Pricing(props: PricingProps) {
   return (
     <section
       id='pricing'
-      className='bg-background border-border/60 relative scroll-mt-20 border-t py-24'
+      className='bg-background border-border/60 relative scroll-mt-20 border-t py-16 md:py-20'
     >
       <div className='container-main relative z-10'>
         <div className='mb-16 text-center'>
@@ -222,7 +214,7 @@ export function Pricing(props: PricingProps) {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.45, delay: 0.2 }}
-          className='border-border mt-24 border-t pt-16'
+          className='border-border mt-16 border-t pt-12'
         >
           <div className='mb-10 text-center'>
             <h3 className='text-foreground font-display text-2xl font-bold tracking-tight'>

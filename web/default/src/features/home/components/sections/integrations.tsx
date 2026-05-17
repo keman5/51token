@@ -92,7 +92,7 @@ export function Integrations() {
   ]
 
   return (
-    <section className='bg-background border-border/60 relative overflow-hidden border-t py-24'>
+    <section className='bg-background border-border/60 relative overflow-hidden border-t py-16 md:py-20'>
       <div className='container-main relative z-10'>
         <div className='grid items-center gap-16 lg:grid-cols-2'>
           <motion.div

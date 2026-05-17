@@ -128,7 +128,7 @@ export function Stats(_props: StatsProps) {
   ]
 
   return (
-    <section className='border-border-light bg-background relative z-10 overflow-hidden border-y py-16 md:py-20'>
+    <section className='border-border-light bg-background relative z-10 overflow-hidden border-y py-10 md:py-12'>
       <div
         aria-hidden
         className="absolute inset-0 bg-[url('https://transparenttextures.com/patterns/cubes.png')] opacity-5"

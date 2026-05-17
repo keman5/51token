@@ -71,7 +71,7 @@ export function Hero(props: HeroProps) {
   )
 
   return (
-    <section className='bg-background relative z-10 overflow-hidden pt-32 pb-20 md:pt-48 md:pb-32'>
+    <section className='bg-background relative z-10 overflow-hidden pt-28 pb-14 md:pt-40 md:pb-20'>
       <div
         aria-hidden
         className='bg-primary/10 pointer-events-none absolute top-1/2 left-1/2 -z-10 h-[400px] w-[800px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[120px]'

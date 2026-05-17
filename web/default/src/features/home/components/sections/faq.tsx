@@ -53,7 +53,7 @@ export function FAQ() {
   ]
 
   return (
-    <section className='bg-background border-border-light relative border-t py-24'>
+    <section className='bg-background border-border-light relative border-t py-16 md:py-20'>
       <div className='container-main relative z-10'>
         <div className='mb-16 text-center'>
           <h2 className='text-foreground font-display mb-4 text-3xl font-bold tracking-tight md:text-4xl'>
