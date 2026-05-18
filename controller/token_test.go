@@ -32,10 +32,20 @@ type tokenPageResponse struct {
 }
 
 type tokenResponseItem struct {
-	ID     int    `json:"id"`
-	Name   string `json:"name"`
-	Key    string `json:"key"`
-	Status int    `json:"status"`
+	ID               int    `json:"id"`
+	Name             string `json:"name"`
+	Key              string `json:"key"`
+	Status           int    `json:"status"`
+	Quota5hLimit     int    `json:"quota_5h_limit"`
+	Quota5hUsed      int    `json:"quota_5h_used"`
+	QuotaWeeklyLimit int    `json:"quota_weekly_limit"`
+	QuotaWeeklyUsed  int    `json:"quota_weekly_used"`
+	Quota5hAvailable int    `json:"quota_5h_available"`
+	WeeklyAvailable  int    `json:"quota_weekly_available"`
+	Quota5hExpiresAt int64  `json:"quota_5h_expires_at"`
+	WeeklyExpiresAt  int64  `json:"quota_weekly_expires_at"`
+	ExpiredTime      int64  `json:"expired_time"`
+	CreatedTime      int64  `json:"created_time"`
 }
 
 type tokenKeyResponse struct {
@@ -48,21 +58,21 @@ type sqliteColumnInfo struct {
 }
 
 type legacyToken struct {
-	Id                 int            `gorm:"primaryKey"`
-	UserId             int            `gorm:"index"`
-	Key                string         `gorm:"column:key;type:char(48);uniqueIndex"`
-	Status             int            `gorm:"default:1"`
-	Name               string         `gorm:"index"`
-	CreatedTime        int64          `gorm:"bigint"`
-	AccessedTime       int64          `gorm:"bigint"`
-	ExpiredTime        int64          `gorm:"bigint;default:-1"`
-	RemainQuota        int            `gorm:"default:0"`
+	Id                 int    `gorm:"primaryKey"`
+	UserId             int    `gorm:"index"`
+	Key                string `gorm:"column:key;type:char(48);uniqueIndex"`
+	Status             int    `gorm:"default:1"`
+	Name               string `gorm:"index"`
+	CreatedTime        int64  `gorm:"bigint"`
+	AccessedTime       int64  `gorm:"bigint"`
+	ExpiredTime        int64  `gorm:"bigint;default:-1"`
+	RemainQuota        int    `gorm:"default:0"`
 	UnlimitedQuota     bool
 	ModelLimitsEnabled bool
-	ModelLimits        string         `gorm:"type:text"`
-	AllowIps           *string        `gorm:"default:''"`
-	UsedQuota          int            `gorm:"default:0"`
-	Group              string         `gorm:"column:group;default:''"`
+	ModelLimits        string  `gorm:"type:text"`
+	AllowIps           *string `gorm:"default:''"`
+	UsedQuota          int     `gorm:"default:0"`
+	Group              string  `gorm:"column:group;default:''"`
 	CrossGroupRetry    bool
 	DeletedAt          gorm.DeletedAt `gorm:"index"`
 }
@@ -393,6 +403,19 @@ func TestTokenMigrationFromChar48ToVarchar128Postgres(t *testing.T) {
 func TestGetAllTokensMasksKeyInResponse(t *testing.T) {
 	db := setupTokenControllerTestDB(t)
 	token := seedToken(t, db, 1, "list-token", "abcd1234efgh5678")
+	now := common.GetTimestamp()
+	if err := db.Model(&model.Token{}).Where("id = ?", token.Id).Updates(map[string]any{
+		"created_time":              now - 60,
+		"expired_time":              now + 60,
+		"quota_5h_limit":            100,
+		"quota_5h_used":             40,
+		"quota_5h_window_start":     now - 30,
+		"quota_weekly_limit":        500,
+		"quota_weekly_used":         120,
+		"quota_weekly_window_start": now - 60,
+	}).Error; err != nil {
+		t.Fatalf("failed to seed window fields: %v", err)
+	}
 	seedToken(t, db, 2, "other-user-token", "zzzz1234yyyy5678")
 
 	ctx, recorder := newAuthenticatedContext(t, http.MethodGet, "/api/token/?p=1&size=10", nil, 1)
@@ -413,8 +436,86 @@ func TestGetAllTokensMasksKeyInResponse(t *testing.T) {
 	if page.Items[0].Key != token.GetMaskedKey() {
 		t.Fatalf("expected masked key %q, got %q", token.GetMaskedKey(), page.Items[0].Key)
 	}
+	if page.Items[0].Quota5hLimit != 100 || page.Items[0].Quota5hUsed != 40 || page.Items[0].Quota5hAvailable != 60 {
+		t.Fatalf("expected 5h quota summary 100/40/60, got limit=%d used=%d available=%d", page.Items[0].Quota5hLimit, page.Items[0].Quota5hUsed, page.Items[0].Quota5hAvailable)
+	}
+	if page.Items[0].QuotaWeeklyLimit != 500 || page.Items[0].QuotaWeeklyUsed != 120 || page.Items[0].WeeklyAvailable != 380 {
+		t.Fatalf("expected weekly quota summary 500/120/380, got limit=%d used=%d available=%d", page.Items[0].QuotaWeeklyLimit, page.Items[0].QuotaWeeklyUsed, page.Items[0].WeeklyAvailable)
+	}
 	if strings.Contains(recorder.Body.String(), token.Key) {
 		t.Fatalf("list response leaked raw token key: %s", recorder.Body.String())
+	}
+}
+
+func TestGetAllTokensShowsZeroWindowAvailabilityAfterExpiration(t *testing.T) {
+	db := setupTokenControllerTestDB(t)
+	token := seedToken(t, db, 1, "expired-window-token", "expired1234window5678")
+	now := common.GetTimestamp()
+	if err := db.Model(&model.Token{}).Where("id = ?", token.Id).Updates(map[string]any{
+		"created_time":              now - 40*24*60*60,
+		"expired_time":              now - 1,
+		"quota_5h_limit":            100,
+		"quota_5h_used":             40,
+		"quota_5h_window_start":     now - 30,
+		"quota_weekly_limit":        500,
+		"quota_weekly_used":         120,
+		"quota_weekly_window_start": now - 60,
+	}).Error; err != nil {
+		t.Fatalf("failed to seed expired window fields: %v", err)
+	}
+
+	ctx, recorder := newAuthenticatedContext(t, http.MethodGet, "/api/token/?p=1&size=10", nil, 1)
+	GetAllTokens(ctx)
+
+	response := decodeAPIResponse(t, recorder)
+	if !response.Success {
+		t.Fatalf("expected success response, got message: %s", response.Message)
+	}
+
+	var page tokenPageResponse
+	if err := common.Unmarshal(response.Data, &page); err != nil {
+		t.Fatalf("failed to decode token page response: %v", err)
+	}
+	if len(page.Items) != 1 {
+		t.Fatalf("expected exactly one token, got %d", len(page.Items))
+	}
+	if page.Items[0].Quota5hAvailable != 0 || page.Items[0].WeeklyAvailable != 0 {
+		t.Fatalf("expected expired token window availability to be 0, got 5h=%d weekly=%d", page.Items[0].Quota5hAvailable, page.Items[0].WeeklyAvailable)
+	}
+}
+
+func TestAddTokenDefaultsToOneMonthExpirationFromCreation(t *testing.T) {
+	db := setupTokenControllerTestDB(t)
+	before := common.GetTimestamp()
+	body := map[string]any{
+		"name":                 "monthly-token",
+		"remain_quota":         1000,
+		"unlimited_quota":      true,
+		"quota_5h_limit":       100,
+		"quota_weekly_limit":   500,
+		"model_limits_enabled": false,
+		"model_limits":         "",
+		"group":                "default",
+		"cross_group_retry":    false,
+	}
+
+	ctx, recorder := newAuthenticatedContext(t, http.MethodPost, "/api/token/", body, 1)
+	AddToken(ctx)
+
+	response := decodeAPIResponse(t, recorder)
+	if !response.Success {
+		t.Fatalf("expected success response, got message: %s", response.Message)
+	}
+
+	var token model.Token
+	if err := db.First(&token, "name = ?", "monthly-token").Error; err != nil {
+		t.Fatalf("failed to load created token: %v", err)
+	}
+	if token.CreatedTime < before {
+		t.Fatalf("expected created time >= %d, got %d", before, token.CreatedTime)
+	}
+	if token.ExpiredTime != model.TokenMonthlyExpirationFromCreatedTime(token.CreatedTime) {
+		t.Fatalf("expected expiration %d, got %d", model.TokenMonthlyExpirationFromCreatedTime(token.CreatedTime), token.ExpiredTime)
 	}
 }
 
@@ -503,6 +604,111 @@ func TestUpdateTokenMasksKeyInResponse(t *testing.T) {
 	}
 	if strings.Contains(recorder.Body.String(), token.Key) {
 		t.Fatalf("update response leaked raw token key: %s", recorder.Body.String())
+	}
+}
+
+func TestUpdateTokenIncreasingFiveHourLimitKeepsWindowUsage(t *testing.T) {
+	db := setupTokenControllerTestDB(t)
+	token := seedToken(t, db, 1, "window-recharge-token", "hour1234recharge5678")
+	now := common.GetTimestamp()
+	if err := db.Model(&model.Token{}).Where("id = ?", token.Id).Updates(map[string]any{
+		"remain_quota":              1000,
+		"unlimited_quota":           true,
+		"quota_5h_limit":            100,
+		"quota_5h_used":             100,
+		"quota_5h_window_start":     now,
+		"quota_weekly_limit":        500,
+		"quota_weekly_used":         100,
+		"quota_weekly_window_start": now,
+	}).Error; err != nil {
+		t.Fatalf("failed to seed quota windows: %v", err)
+	}
+
+	body := map[string]any{
+		"id":                   token.Id,
+		"name":                 "window-recharge-token",
+		"expired_time":         now + 30*24*60*60,
+		"remain_quota":         1000,
+		"unlimited_quota":      true,
+		"quota_5h_limit":       150,
+		"quota_weekly_limit":   500,
+		"model_limits_enabled": false,
+		"model_limits":         "",
+		"group":                "default",
+		"cross_group_retry":    false,
+	}
+
+	ctx, recorder := newAuthenticatedContext(t, http.MethodPut, "/api/token/", body, 1)
+	UpdateToken(ctx)
+
+	response := decodeAPIResponse(t, recorder)
+	if !response.Success {
+		t.Fatalf("expected success response, got message: %s", response.Message)
+	}
+
+	var updated model.Token
+	if err := db.First(&updated, token.Id).Error; err != nil {
+		t.Fatalf("failed to load updated token: %v", err)
+	}
+	if updated.Quota5hLimit != 150 {
+		t.Fatalf("expected 5h limit 150, got %d", updated.Quota5hLimit)
+	}
+	if updated.Quota5hUsed != 100 {
+		t.Fatalf("expected 5h used to remain 100, got %d", updated.Quota5hUsed)
+	}
+	if err := model.DecreaseTokenQuota(token.Id, token.Key, 50); err != nil {
+		t.Fatalf("expected recharged 5h window to allow 50 quota, got %v", err)
+	}
+}
+
+func TestUpdateTokenRenewingExpiredTokenRefillsWindowLimits(t *testing.T) {
+	db := setupTokenControllerTestDB(t)
+	token := seedToken(t, db, 1, "renew-window-token", "renew1234window5678")
+	now := common.GetTimestamp()
+	if err := db.Model(&model.Token{}).Where("id = ?", token.Id).Updates(map[string]any{
+		"status":                    common.TokenStatusExpired,
+		"created_time":              now - 40*24*60*60,
+		"expired_time":              now - 1,
+		"remain_quota":              1000,
+		"unlimited_quota":           true,
+		"quota_5h_limit":            100,
+		"quota_5h_used":             100,
+		"quota_5h_window_start":     now - 60,
+		"quota_weekly_limit":        500,
+		"quota_weekly_used":         500,
+		"quota_weekly_window_start": now - 8*24*60*60,
+	}).Error; err != nil {
+		t.Fatalf("failed to seed expired quota windows: %v", err)
+	}
+
+	body := map[string]any{
+		"id":                   token.Id,
+		"name":                 "renew-window-token",
+		"expired_time":         now + 30*24*60*60,
+		"remain_quota":         1000,
+		"unlimited_quota":      true,
+		"quota_5h_limit":       100,
+		"quota_weekly_limit":   500,
+		"model_limits_enabled": false,
+		"model_limits":         "",
+		"group":                "default",
+		"cross_group_retry":    false,
+	}
+
+	ctx, recorder := newAuthenticatedContext(t, http.MethodPut, "/api/token/", body, 1)
+	UpdateToken(ctx)
+
+	response := decodeAPIResponse(t, recorder)
+	if !response.Success {
+		t.Fatalf("expected success response, got message: %s", response.Message)
+	}
+
+	var updated model.Token
+	if err := db.First(&updated, token.Id).Error; err != nil {
+		t.Fatalf("failed to load updated token: %v", err)
+	}
+	if updated.Quota5hUsed != 0 || updated.WeeklyUsed != 0 {
+		t.Fatalf("expected renewed token windows to refill, got 5h_used=%d weekly_used=%d", updated.Quota5hUsed, updated.WeeklyUsed)
 	}
 }
 

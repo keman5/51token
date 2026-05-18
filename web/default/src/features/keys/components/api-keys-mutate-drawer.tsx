@@ -375,20 +375,11 @@ export function ApiKeysMutateDrawer({
                         <DateTimePicker
                           value={field.value}
                           onChange={field.onChange}
-                          placeholder={t('Never expires')}
+                          placeholder={t('1 Month')}
                           className='min-w-0 [&_input[type=time]]:w-24 sm:[&_input[type=time]]:w-32'
                         />
                       </FormControl>
-                      <div className='grid grid-cols-4 gap-2 sm:flex'>
-                        <Button
-                          type='button'
-                          variant='outline'
-                          size='sm'
-                          className='px-2 text-xs sm:px-3 sm:text-sm'
-                          onClick={() => handleSetExpiry(0, 0, 0)}
-                        >
-                          {t('Never')}
-                        </Button>
+                      <div className='grid grid-cols-3 gap-2 sm:flex'>
                         <Button
                           type='button'
                           variant='outline'
@@ -511,6 +502,70 @@ export function ApiKeysMutateDrawer({
                   </FormItem>
                 )}
               />
+
+              <div className='grid gap-3 sm:grid-cols-2'>
+                <FormField
+                  control={form.control}
+                  name='quota_5h_limit_dollars'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        {t('5-hour limit ({{currency}})', {
+                          currency: currencyLabel,
+                        })}
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type='number'
+                          min='0'
+                          step={tokensOnly ? 1 : 0.01}
+                          placeholder='0'
+                          onChange={(e) =>
+                            field.onChange(parseFloat(e.target.value) || 0)
+                          }
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t(
+                          'Set to 0 to disable. Increase this value to recharge the current 5-hour window.'
+                        )}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name='quota_weekly_limit_dollars'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        {t('Weekly limit ({{currency}})', {
+                          currency: currencyLabel,
+                        })}
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type='number'
+                          min='0'
+                          step={tokensOnly ? 1 : 0.01}
+                          placeholder='0'
+                          onChange={(e) =>
+                            field.onChange(parseFloat(e.target.value) || 0)
+                          }
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t('Set to 0 to disable the weekly key limit')}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </ApiKeyFormSection>
 
             <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>

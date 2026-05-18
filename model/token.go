@@ -4,11 +4,17 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/bytedance/gopkg/util/gopool"
 	"gorm.io/gorm"
+)
+
+const (
+	tokenQuota5hWindowSeconds     int64 = 5 * 60 * 60
+	tokenQuotaWeeklyWindowSeconds int64 = 7 * 24 * 60 * 60
 )
 
 type Token struct {
@@ -26,6 +32,16 @@ type Token struct {
 	ModelLimits        string         `json:"model_limits" gorm:"type:text"`
 	AllowIps           *string        `json:"allow_ips" gorm:"default:''"`
 	UsedQuota          int            `json:"used_quota" gorm:"default:0"` // used quota
+	Quota5hLimit       int            `json:"quota_5h_limit" gorm:"column:quota_5h_limit;default:0"`
+	Quota5hUsed        int            `json:"quota_5h_used" gorm:"column:quota_5h_used;default:0"`
+	Quota5hWindowStart int64          `json:"quota_5h_window_start" gorm:"column:quota_5h_window_start;bigint;default:0"`
+	Quota5hAvailable   int            `json:"quota_5h_available" gorm:"-"`
+	Quota5hExpiresAt   int64          `json:"quota_5h_expires_at" gorm:"-"`
+	WeeklyLimit        int            `json:"quota_weekly_limit" gorm:"column:quota_weekly_limit;default:0"`
+	WeeklyUsed         int            `json:"quota_weekly_used" gorm:"column:quota_weekly_used;default:0"`
+	WeeklyWindowStart  int64          `json:"quota_weekly_window_start" gorm:"column:quota_weekly_window_start;bigint;default:0"`
+	WeeklyAvailable    int            `json:"quota_weekly_available" gorm:"-"`
+	WeeklyExpiresAt    int64          `json:"quota_weekly_expires_at" gorm:"-"`
 	Group              string         `json:"group" gorm:"default:''"`
 	CrossGroupRetry    bool           `json:"cross_group_retry"` // 跨分组重试，仅auto分组有效
 	DeletedAt          gorm.DeletedAt `gorm:"index"`
@@ -33,6 +49,66 @@ type Token struct {
 
 func (token *Token) Clean() {
 	token.Key = ""
+}
+
+func TokenMonthlyExpirationFromCreatedTime(createdTime int64) int64 {
+	if createdTime <= 0 {
+		createdTime = common.GetTimestamp()
+	}
+	created := time.Unix(createdTime, 0)
+	year, month, day := created.Date()
+	hour, minute, second := created.Clock()
+	nextMonth := month + 1
+	lastDayOfNextMonth := time.Date(year, nextMonth+1, 0, hour, minute, second, created.Nanosecond(), created.Location()).Day()
+	if day > lastDayOfNextMonth {
+		day = lastDayOfNextMonth
+	}
+	return time.Date(year, nextMonth, day, hour, minute, second, created.Nanosecond(), created.Location()).Unix()
+}
+
+func (token *Token) IsExpiredAt(now int64) bool {
+	return token != nil && token.ExpiredTime != -1 && token.ExpiredTime > 0 && token.ExpiredTime < now
+}
+
+func (token *Token) EnsureMonthlyExpiration() {
+	if token == nil {
+		return
+	}
+	if token.ExpiredTime <= 0 {
+		token.ExpiredTime = TokenMonthlyExpirationFromCreatedTime(token.CreatedTime)
+	}
+}
+
+func PrepareTokenQuotaSummary(token *Token, now int64) {
+	if token == nil {
+		return
+	}
+	token.Quota5hAvailable = 0
+	token.Quota5hExpiresAt = 0
+	token.WeeklyAvailable = 0
+	token.WeeklyExpiresAt = 0
+	if token.IsExpiredAt(now) {
+		return
+	}
+	if token.Quota5hLimit > 0 {
+		used := token.Quota5hUsed
+		windowStart := token.Quota5hWindowStart
+		if windowStart <= 0 || now < windowStart || now-windowStart >= tokenQuota5hWindowSeconds {
+			used = 0
+			windowStart = now
+		}
+		token.Quota5hAvailable = max(token.Quota5hLimit-used, 0)
+		token.Quota5hExpiresAt = windowStart + tokenQuota5hWindowSeconds
+	}
+	if token.WeeklyLimit > 0 {
+		windowStart := tokenWeeklyWindowStart(token.CreatedTime, now)
+		used := token.WeeklyUsed
+		if token.WeeklyWindowStart != windowStart {
+			used = 0
+		}
+		token.WeeklyAvailable = max(token.WeeklyLimit-used, 0)
+		token.WeeklyExpiresAt = windowStart + tokenQuotaWeeklyWindowSeconds
+	}
 }
 
 func MaskTokenKey(key string) string {
@@ -295,7 +371,9 @@ func (token *Token) Update() (err error) {
 		}
 	}()
 	err = DB.Model(token).Select("name", "status", "expired_time", "remain_quota", "unlimited_quota",
-		"model_limits_enabled", "model_limits", "allow_ips", "group", "cross_group_retry").Updates(token).Error
+		"model_limits_enabled", "model_limits", "allow_ips", "quota_5h_limit", "quota_5h_used",
+		"quota_5h_window_start", "quota_weekly_limit", "quota_weekly_used", "quota_weekly_window_start",
+		"group", "cross_group_retry").Updates(token).Error
 	return err
 }
 
@@ -376,7 +454,8 @@ func IncreaseTokenQuota(tokenId int, key string, quota int) (err error) {
 	if quota < 0 {
 		return errors.New("quota 不能为负数！")
 	}
-	if common.RedisEnabled {
+	err = increaseTokenQuota(tokenId, quota)
+	if err == nil && common.RedisEnabled {
 		gopool.Go(func() {
 			err := cacheIncrTokenQuota(key, int64(quota))
 			if err != nil {
@@ -384,29 +463,45 @@ func IncreaseTokenQuota(tokenId int, key string, quota int) (err error) {
 			}
 		})
 	}
-	if common.BatchUpdateEnabled {
-		addNewRecord(BatchUpdateTypeTokenQuota, tokenId, quota)
-		return nil
-	}
-	return increaseTokenQuota(tokenId, quota)
+	return err
 }
 
 func increaseTokenQuota(id int, quota int) (err error) {
-	err = DB.Model(&Token{}).Where("id = ?", id).Updates(
-		map[string]interface{}{
-			"remain_quota":  gorm.Expr("remain_quota + ?", quota),
-			"used_quota":    gorm.Expr("used_quota - ?", quota),
-			"accessed_time": common.GetTimestamp(),
-		},
-	).Error
-	return err
+	if quota == 0 {
+		return nil
+	}
+	return DB.Transaction(func(tx *gorm.DB) error {
+		var token Token
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("id = ?", id).First(&token).Error; err != nil {
+			return err
+		}
+		now := common.GetTimestamp()
+		normalizeTokenQuotaWindows(&token, now)
+		token.RemainQuota += quota
+		token.UsedQuota -= quota
+		if token.Quota5hLimit > 0 {
+			token.Quota5hUsed -= quota
+			if token.Quota5hUsed < 0 {
+				token.Quota5hUsed = 0
+			}
+		}
+		if token.WeeklyLimit > 0 {
+			token.WeeklyUsed -= quota
+			if token.WeeklyUsed < 0 {
+				token.WeeklyUsed = 0
+			}
+		}
+		token.AccessedTime = now
+		return saveTokenQuotaStateTx(tx, &token)
+	})
 }
 
 func DecreaseTokenQuota(id int, key string, quota int) (err error) {
 	if quota < 0 {
 		return errors.New("quota 不能为负数！")
 	}
-	if common.RedisEnabled {
+	err = decreaseTokenQuota(id, quota)
+	if err == nil && common.RedisEnabled {
 		gopool.Go(func() {
 			err := cacheDecrTokenQuota(key, int64(quota))
 			if err != nil {
@@ -414,22 +509,181 @@ func DecreaseTokenQuota(id int, key string, quota int) (err error) {
 			}
 		})
 	}
-	if common.BatchUpdateEnabled {
-		addNewRecord(BatchUpdateTypeTokenQuota, id, -quota)
-		return nil
-	}
-	return decreaseTokenQuota(id, quota)
+	return err
 }
 
 func decreaseTokenQuota(id int, quota int) (err error) {
-	err = DB.Model(&Token{}).Where("id = ?", id).Updates(
-		map[string]interface{}{
-			"remain_quota":  gorm.Expr("remain_quota - ?", quota),
-			"used_quota":    gorm.Expr("used_quota + ?", quota),
-			"accessed_time": common.GetTimestamp(),
-		},
-	).Error
-	return err
+	if quota == 0 {
+		return nil
+	}
+	return DB.Transaction(func(tx *gorm.DB) error {
+		var token Token
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").Where("id = ?", id).First(&token).Error; err != nil {
+			return err
+		}
+		now := common.GetTimestamp()
+		if token.IsExpiredAt(now) {
+			return fmt.Errorf("token 已过期")
+		}
+		normalizeTokenQuotaWindows(&token, now)
+		if !token.UnlimitedQuota && token.RemainQuota < quota {
+			return fmt.Errorf("token quota is not enough, token remain quota: %d, need quota: %d", token.RemainQuota, quota)
+		}
+		if token.Quota5hLimit > 0 && token.Quota5hUsed+quota > token.Quota5hLimit {
+			return fmt.Errorf("token 5小时限额不足, 5小时剩余额度: %d, need quota: %d", token.Quota5hLimit-token.Quota5hUsed, quota)
+		}
+		if token.WeeklyLimit > 0 && token.WeeklyUsed+quota > token.WeeklyLimit {
+			return fmt.Errorf("token 周限额不足, 周剩余额度: %d, need quota: %d", token.WeeklyLimit-token.WeeklyUsed, quota)
+		}
+		token.RemainQuota -= quota
+		token.UsedQuota += quota
+		if token.Quota5hLimit > 0 {
+			token.Quota5hUsed += quota
+		}
+		if token.WeeklyLimit > 0 {
+			token.WeeklyUsed += quota
+		}
+		token.AccessedTime = now
+		return saveTokenQuotaStateTx(tx, &token)
+	})
+}
+
+func saveTokenQuotaStateTx(tx *gorm.DB, token *Token) error {
+	return tx.Model(&Token{}).Where("id = ?", token.Id).Updates(map[string]interface{}{
+		"remain_quota":              token.RemainQuota,
+		"used_quota":                token.UsedQuota,
+		"accessed_time":             token.AccessedTime,
+		"quota_5h_used":             token.Quota5hUsed,
+		"quota_5h_window_start":     token.Quota5hWindowStart,
+		"quota_weekly_used":         token.WeeklyUsed,
+		"quota_weekly_window_start": token.WeeklyWindowStart,
+	}).Error
+}
+
+func normalizeTokenQuotaWindows(token *Token, now int64) {
+	if token.Quota5hLimit > 0 {
+		if token.Quota5hWindowStart <= 0 || now < token.Quota5hWindowStart || now-token.Quota5hWindowStart >= tokenQuota5hWindowSeconds {
+			token.Quota5hWindowStart = now
+			token.Quota5hUsed = 0
+		}
+	} else {
+		token.Quota5hWindowStart = 0
+		token.Quota5hUsed = 0
+	}
+
+	if token.WeeklyLimit > 0 {
+		windowStart := tokenWeeklyWindowStart(token.CreatedTime, now)
+		if token.WeeklyWindowStart != windowStart {
+			token.WeeklyWindowStart = windowStart
+			token.WeeklyUsed = 0
+		}
+	} else {
+		token.WeeklyWindowStart = 0
+		token.WeeklyUsed = 0
+	}
+}
+
+func tokenWeeklyWindowStart(createdTime int64, now int64) int64 {
+	if createdTime <= 0 {
+		return currentTokenWeeklyWindowStart(now)
+	}
+	if now <= createdTime {
+		return createdTime
+	}
+	windowsElapsed := (now - createdTime) / tokenQuotaWeeklyWindowSeconds
+	return createdTime + windowsElapsed*tokenQuotaWeeklyWindowSeconds
+}
+
+func currentTokenWeeklyWindowStart(now int64) int64 {
+	current := time.Unix(now, 0)
+	weekday := int(current.Weekday())
+	if weekday == 0 {
+		weekday = 7
+	}
+	return time.Date(current.Year(), current.Month(), current.Day(), 0, 0, 0, 0, current.Location()).
+		AddDate(0, 0, 1-weekday).
+		Unix()
+}
+
+func ResetDueTokenQuotaWindows(limit int) (int, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	now := common.GetTimestamp()
+	resetCount := 0
+
+	var fiveHourTokens []Token
+	fiveHourCutoff := now - tokenQuota5hWindowSeconds
+	if err := DB.
+		Where("quota_5h_limit > 0 AND quota_5h_window_start > 0 AND quota_5h_window_start <= ? AND (expired_time = -1 OR expired_time > ?)", fiveHourCutoff, now).
+		Order("quota_5h_window_start asc").
+		Limit(limit).
+		Find(&fiveHourTokens).Error; err != nil {
+		return resetCount, err
+	}
+	for _, candidate := range fiveHourTokens {
+		tokenId := candidate.Id
+		err := DB.Transaction(func(tx *gorm.DB) error {
+			var locked Token
+			if err := tx.Set("gorm:query_option", "FOR UPDATE").
+				Where("id = ? AND quota_5h_limit > 0 AND quota_5h_window_start > 0 AND quota_5h_window_start <= ? AND (expired_time = -1 OR expired_time > ?)", tokenId, fiveHourCutoff, now).
+				First(&locked).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return nil
+				}
+				return err
+			}
+			return tx.Model(&Token{}).Where("id = ?", locked.Id).Updates(map[string]interface{}{
+				"quota_5h_used":         0,
+				"quota_5h_window_start": 0,
+			}).Error
+		})
+		if err != nil {
+			return resetCount, err
+		}
+		resetCount++
+	}
+
+	remaining := limit - resetCount
+	if remaining <= 0 {
+		return resetCount, nil
+	}
+	var weeklyTokens []Token
+	if err := DB.
+		Where("quota_weekly_limit > 0 AND quota_weekly_window_start > 0 AND quota_weekly_window_start <= ? AND (expired_time = -1 OR expired_time > ?)", now-tokenQuotaWeeklyWindowSeconds, now).
+		Order("quota_weekly_window_start asc").
+		Limit(remaining).
+		Find(&weeklyTokens).Error; err != nil {
+		return resetCount, err
+	}
+	for _, candidate := range weeklyTokens {
+		tokenId := candidate.Id
+		err := DB.Transaction(func(tx *gorm.DB) error {
+			var locked Token
+			if err := tx.Set("gorm:query_option", "FOR UPDATE").
+				Where("id = ? AND quota_weekly_limit > 0 AND quota_weekly_window_start > 0 AND quota_weekly_window_start <= ? AND (expired_time = -1 OR expired_time > ?)", tokenId, now-tokenQuotaWeeklyWindowSeconds, now).
+				First(&locked).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return nil
+				}
+				return err
+			}
+			currentWeeklyStart := tokenWeeklyWindowStart(locked.CreatedTime, now)
+			if locked.WeeklyWindowStart == currentWeeklyStart {
+				return nil
+			}
+			return tx.Model(&Token{}).Where("id = ?", locked.Id).Updates(map[string]interface{}{
+				"quota_weekly_used":         0,
+				"quota_weekly_window_start": currentWeeklyStart,
+			}).Error
+		})
+		if err != nil {
+			return resetCount, err
+		}
+		resetCount++
+	}
+
+	return resetCount, nil
 }
 
 // CountUserTokens returns total number of tokens for the given user, used for pagination

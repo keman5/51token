@@ -20,6 +20,7 @@ func buildMaskedTokenResponse(token *model.Token) *model.Token {
 	}
 	maskedToken := *token
 	maskedToken.Key = token.GetMaskedKey()
+	model.PrepareTokenQuotaSummary(&maskedToken, common.GetTimestamp())
 	return &maskedToken
 }
 
@@ -29,6 +30,30 @@ func buildMaskedTokenResponses(tokens []*model.Token) []*model.Token {
 		maskedTokens = append(maskedTokens, buildMaskedTokenResponse(token))
 	}
 	return maskedTokens
+}
+
+func validateTokenQuotaInputs(c *gin.Context, token *model.Token) bool {
+	if !token.UnlimitedQuota {
+		if token.RemainQuota < 0 {
+			common.ApiErrorI18n(c, i18n.MsgTokenQuotaNegative)
+			return false
+		}
+		maxQuotaValue := int((1000000000 * common.QuotaPerUnit))
+		if token.RemainQuota > maxQuotaValue {
+			common.ApiErrorI18n(c, i18n.MsgTokenQuotaExceedMax, map[string]any{"Max": maxQuotaValue})
+			return false
+		}
+	}
+	if token.Quota5hLimit < 0 || token.WeeklyLimit < 0 {
+		common.ApiError(c, fmt.Errorf("令牌周期限额不能为负数"))
+		return false
+	}
+	maxQuotaValue := int((1000000000 * common.QuotaPerUnit))
+	if token.Quota5hLimit > maxQuotaValue || token.WeeklyLimit > maxQuotaValue {
+		common.ApiErrorI18n(c, i18n.MsgTokenQuotaExceedMax, map[string]any{"Max": maxQuotaValue})
+		return false
+	}
+	return true
 }
 
 func GetAllTokens(c *gin.Context) {
@@ -146,20 +171,29 @@ func GetTokenUsage(c *gin.Context) {
 	if expiredAt == -1 {
 		expiredAt = 0
 	}
+	model.PrepareTokenQuotaSummary(token, common.GetTimestamp())
 
 	c.JSON(http.StatusOK, gin.H{
 		"code":    true,
 		"message": "ok",
 		"data": gin.H{
-			"object":               "token_usage",
-			"name":                 token.Name,
-			"total_granted":        token.RemainQuota + token.UsedQuota,
-			"total_used":           token.UsedQuota,
-			"total_available":      token.RemainQuota,
-			"unlimited_quota":      token.UnlimitedQuota,
-			"model_limits":         token.GetModelLimitsMap(),
-			"model_limits_enabled": token.ModelLimitsEnabled,
-			"expires_at":           expiredAt,
+			"object":                  "token_usage",
+			"name":                    token.Name,
+			"total_granted":           token.RemainQuota + token.UsedQuota,
+			"total_used":              token.UsedQuota,
+			"total_available":         token.RemainQuota,
+			"unlimited_quota":         token.UnlimitedQuota,
+			"quota_5h_limit":          token.Quota5hLimit,
+			"quota_5h_used":           token.Quota5hUsed,
+			"quota_5h_available":      token.Quota5hAvailable,
+			"quota_5h_expires_at":     token.Quota5hExpiresAt,
+			"quota_weekly_limit":      token.WeeklyLimit,
+			"quota_weekly_used":       token.WeeklyUsed,
+			"quota_weekly_available":  token.WeeklyAvailable,
+			"quota_weekly_expires_at": token.WeeklyExpiresAt,
+			"model_limits":            token.GetModelLimitsMap(),
+			"model_limits_enabled":    token.ModelLimitsEnabled,
+			"expires_at":              expiredAt,
 		},
 	})
 }
@@ -175,17 +209,8 @@ func AddToken(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgTokenNameTooLong)
 		return
 	}
-	// 非无限额度时，检查额度值是否超出有效范围
-	if !token.UnlimitedQuota {
-		if token.RemainQuota < 0 {
-			common.ApiErrorI18n(c, i18n.MsgTokenQuotaNegative)
-			return
-		}
-		maxQuotaValue := int((1000000000 * common.QuotaPerUnit))
-		if token.RemainQuota > maxQuotaValue {
-			common.ApiErrorI18n(c, i18n.MsgTokenQuotaExceedMax, map[string]any{"Max": maxQuotaValue})
-			return
-		}
+	if !validateTokenQuotaInputs(c, &token) {
+		return
 	}
 	// 检查用户令牌数量是否已达上限
 	maxTokens := operation_setting.GetMaxUserTokens()
@@ -207,15 +232,22 @@ func AddToken(c *gin.Context) {
 		common.SysLog("failed to generate token key: " + err.Error())
 		return
 	}
+	createdTime := common.GetTimestamp()
+	expiredTime := token.ExpiredTime
+	if expiredTime <= 0 {
+		expiredTime = model.TokenMonthlyExpirationFromCreatedTime(createdTime)
+	}
 	cleanToken := model.Token{
 		UserId:             c.GetInt("id"),
 		Name:               token.Name,
 		Key:                key,
-		CreatedTime:        common.GetTimestamp(),
-		AccessedTime:       common.GetTimestamp(),
-		ExpiredTime:        token.ExpiredTime,
+		CreatedTime:        createdTime,
+		AccessedTime:       createdTime,
+		ExpiredTime:        expiredTime,
 		RemainQuota:        token.RemainQuota,
 		UnlimitedQuota:     token.UnlimitedQuota,
+		Quota5hLimit:       token.Quota5hLimit,
+		WeeklyLimit:        token.WeeklyLimit,
 		ModelLimitsEnabled: token.ModelLimitsEnabled,
 		ModelLimits:        token.ModelLimits,
 		AllowIps:           token.AllowIps,
@@ -260,16 +292,8 @@ func UpdateToken(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgTokenNameTooLong)
 		return
 	}
-	if !token.UnlimitedQuota {
-		if token.RemainQuota < 0 {
-			common.ApiErrorI18n(c, i18n.MsgTokenQuotaNegative)
-			return
-		}
-		maxQuotaValue := int((1000000000 * common.QuotaPerUnit))
-		if token.RemainQuota > maxQuotaValue {
-			common.ApiErrorI18n(c, i18n.MsgTokenQuotaExceedMax, map[string]any{"Max": maxQuotaValue})
-			return
-		}
+	if !validateTokenQuotaInputs(c, &token) {
+		return
 	}
 	cleanToken, err := model.GetTokenByIds(token.Id, userId)
 	if err != nil {
@@ -290,10 +314,29 @@ func UpdateToken(c *gin.Context) {
 		cleanToken.Status = token.Status
 	} else {
 		// If you add more fields, please also update token.Update()
+		now := common.GetTimestamp()
+		wasExpired := cleanToken.IsExpiredAt(now)
 		cleanToken.Name = token.Name
 		cleanToken.ExpiredTime = token.ExpiredTime
+		cleanToken.EnsureMonthlyExpiration()
 		cleanToken.RemainQuota = token.RemainQuota
 		cleanToken.UnlimitedQuota = token.UnlimitedQuota
+		if token.Quota5hLimit <= 0 {
+			cleanToken.Quota5hUsed = 0
+			cleanToken.Quota5hWindowStart = 0
+		}
+		if token.WeeklyLimit <= 0 {
+			cleanToken.WeeklyUsed = 0
+			cleanToken.WeeklyWindowStart = 0
+		}
+		if wasExpired && !cleanToken.IsExpiredAt(now) {
+			cleanToken.Quota5hUsed = 0
+			cleanToken.Quota5hWindowStart = 0
+			cleanToken.WeeklyUsed = 0
+			cleanToken.WeeklyWindowStart = 0
+		}
+		cleanToken.Quota5hLimit = token.Quota5hLimit
+		cleanToken.WeeklyLimit = token.WeeklyLimit
 		cleanToken.ModelLimitsEnabled = token.ModelLimitsEnabled
 		cleanToken.ModelLimits = token.ModelLimits
 		cleanToken.AllowIps = token.AllowIps

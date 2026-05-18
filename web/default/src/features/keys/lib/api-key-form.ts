@@ -31,6 +31,8 @@ export function getApiKeyFormSchema(t: TFunction) {
     .object({
       name: z.string().min(1, t('Please enter a name')),
       remain_quota_dollars: z.number().optional(),
+      quota_5h_limit_dollars: z.number().min(0).optional(),
+      quota_weekly_limit_dollars: z.number().min(0).optional(),
       expired_time: z.date().optional(),
       unlimited_quota: z.boolean(),
       model_limits: z.array(z.string()),
@@ -68,6 +70,8 @@ export type ApiKeyFormValues = z.infer<
 export const API_KEY_FORM_DEFAULT_VALUES: ApiKeyFormValues = {
   name: '',
   remain_quota_dollars: 10,
+  quota_5h_limit_dollars: 0,
+  quota_weekly_limit_dollars: 0,
   expired_time: undefined,
   unlimited_quota: true,
   model_limits: [],
@@ -77,11 +81,18 @@ export const API_KEY_FORM_DEFAULT_VALUES: ApiKeyFormValues = {
   tokenCount: 1,
 }
 
+function getDefaultExpirationDate(): Date {
+  const date = new Date()
+  date.setMonth(date.getMonth() + 1)
+  return date
+}
+
 export function getApiKeyFormDefaultValues(
   defaultUseAutoGroup: boolean
 ): ApiKeyFormValues {
   return {
     ...API_KEY_FORM_DEFAULT_VALUES,
+    expired_time: getDefaultExpirationDate(),
     group: defaultUseAutoGroup ? 'auto' : DEFAULT_GROUP,
     cross_group_retry: defaultUseAutoGroup,
   }
@@ -102,6 +113,10 @@ export function transformFormDataToPayload(
     remain_quota: data.unlimited_quota
       ? 0
       : parseQuotaFromDollars(data.remain_quota_dollars || 0),
+    quota_5h_limit: parseQuotaFromDollars(data.quota_5h_limit_dollars || 0),
+    quota_weekly_limit: parseQuotaFromDollars(
+      data.quota_weekly_limit_dollars || 0
+    ),
     expired_time: data.expired_time
       ? Math.floor(data.expired_time.getTime() / 1000)
       : -1,
@@ -125,6 +140,10 @@ export function transformApiKeyToFormDefaults(
     remain_quota_dollars: apiKey.unlimited_quota
       ? 0
       : quotaUnitsToDollars(apiKey.remain_quota),
+    quota_5h_limit_dollars: quotaUnitsToDollars(apiKey.quota_5h_limit || 0),
+    quota_weekly_limit_dollars: quotaUnitsToDollars(
+      apiKey.quota_weekly_limit || 0
+    ),
     expired_time:
       apiKey.expired_time > 0
         ? new Date(apiKey.expired_time * 1000)

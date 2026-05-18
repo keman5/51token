@@ -67,6 +67,42 @@ function useGroupRatios(): Record<string, number> {
   return data ?? {}
 }
 
+function WindowQuotaLine({
+  label,
+  limit,
+  used,
+  available,
+  expiresAt,
+}: {
+  label: string
+  limit: number
+  used: number
+  available: number
+  expiresAt: number
+}) {
+  if (limit <= 0) return null
+  const percentage = limit > 0 ? (available / limit) * 100 : 0
+
+  return (
+    <div className='space-y-1'>
+      <div className='flex items-center justify-between gap-3 text-xs'>
+        <span className='text-muted-foreground'>{label}</span>
+        <span className='font-mono tabular-nums'>
+          {formatQuota(available)} / {formatQuota(limit)}
+        </span>
+      </div>
+      <Progress
+        value={percentage}
+        className={cn('h-1', getQuotaProgressColor(percentage))}
+      />
+      <div className='text-muted-foreground font-mono text-[10px] tabular-nums'>
+        {expiresAt > 0 ? formatTimestampToDate(expiresAt) : '-'}
+        <span className='ml-2'>-{formatQuota(used)}</span>
+      </div>
+    </div>
+  )
+}
+
 export function useApiKeysColumns(): ColumnDef<ApiKey>[] {
   const { t } = useTranslation()
   const groupRatios = useGroupRatios()
@@ -191,6 +227,67 @@ export function useApiKeysColumns(): ColumnDef<ApiKey>[] {
         )
       },
       meta: { label: t('Quota') },
+    },
+    {
+      id: 'window_limits',
+      accessorKey: 'quota_5h_limit',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t('Window Limits')} />
+      ),
+      cell: ({ row }) => {
+        const apiKey = row.original
+        const hasFiveHourLimit = apiKey.quota_5h_limit > 0
+        const hasWeeklyLimit = apiKey.quota_weekly_limit > 0
+
+        if (!hasFiveHourLimit && !hasWeeklyLimit) {
+          return (
+            <StatusBadge
+              label={t('Disabled')}
+              variant='neutral'
+              copyable={false}
+            />
+          )
+        }
+
+        return (
+          <Tooltip>
+            <TooltipTrigger render={<div className='w-[190px] space-y-2' />}>
+              <WindowQuotaLine
+                label='5h'
+                limit={apiKey.quota_5h_limit}
+                used={apiKey.quota_5h_used}
+                available={apiKey.quota_5h_available}
+                expiresAt={apiKey.quota_5h_expires_at}
+              />
+              <WindowQuotaLine
+                label={t('Weekly')}
+                limit={apiKey.quota_weekly_limit}
+                used={apiKey.quota_weekly_used}
+                available={apiKey.quota_weekly_available}
+                expiresAt={apiKey.quota_weekly_expires_at}
+              />
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className='space-y-1 text-xs'>
+                {hasFiveHourLimit && (
+                  <div>
+                    5h: {formatQuota(apiKey.quota_5h_available)} /{' '}
+                    {formatQuota(apiKey.quota_5h_limit)}
+                  </div>
+                )}
+                {hasWeeklyLimit && (
+                  <div>
+                    {t('Weekly')}: {formatQuota(apiKey.quota_weekly_available)}{' '}
+                    / {formatQuota(apiKey.quota_weekly_limit)}
+                  </div>
+                )}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        )
+      },
+      enableSorting: false,
+      meta: { label: t('Window Limits'), mobileHidden: true },
     },
     {
       accessorKey: 'group',
