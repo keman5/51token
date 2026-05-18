@@ -4363,6 +4363,7 @@
     "Weekly token usage by model since launch": "Weekly token usage by model since launch",
     "Weekly Window": "Weekly Window",
     "Window Limits": "Window Limits",
+    "Window limits apply even when unlimited quota is enabled.": "Window limits apply even when unlimited quota is enabled.",
     "Weight": "Weight",
     "Weighted by request count": "Weighted by request count",
     "Welcome back!": "Welcome back!",

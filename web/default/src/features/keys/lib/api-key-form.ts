@@ -22,6 +22,9 @@ import { parseQuotaFromDollars, quotaUnitsToDollars } from '@/lib/format'
 import { DEFAULT_GROUP } from '../constants'
 import { type ApiKeyFormData, type ApiKey } from '../types'
 
+const DEFAULT_QUOTA_5H_LIMIT_UNITS = 200000000
+const DEFAULT_QUOTA_WEEKLY_LIMIT_UNITS = 1250000000
+
 // ============================================================================
 // Form Schema
 // ============================================================================
@@ -92,6 +95,10 @@ export function getApiKeyFormDefaultValues(
 ): ApiKeyFormValues {
   return {
     ...API_KEY_FORM_DEFAULT_VALUES,
+    quota_5h_limit_dollars: quotaUnitsToDollars(DEFAULT_QUOTA_5H_LIMIT_UNITS),
+    quota_weekly_limit_dollars: quotaUnitsToDollars(
+      DEFAULT_QUOTA_WEEKLY_LIMIT_UNITS
+    ),
     expired_time: getDefaultExpirationDate(),
     group: defaultUseAutoGroup ? 'auto' : DEFAULT_GROUP,
     cross_group_retry: defaultUseAutoGroup,

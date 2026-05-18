@@ -449,6 +449,101 @@ export function ApiKeysMutateDrawer({
               description={t('Set quota amount and limits')}
               icon={WalletCards}
             >
+              <div className='space-y-3'>
+                <div className='text-muted-foreground text-xs'>
+                  {t(
+                    'Window limits apply even when unlimited quota is enabled.'
+                  )}
+                </div>
+
+                <div className='grid gap-3 sm:grid-cols-2'>
+                  <FormField
+                    control={form.control}
+                    name='quota_5h_limit_dollars'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          {t('5-hour limit ({{currency}})', {
+                            currency: currencyLabel,
+                          })}
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type='number'
+                            min='0'
+                            step={tokensOnly ? 1 : 0.01}
+                            placeholder='0'
+                            onChange={(e) =>
+                              field.onChange(parseFloat(e.target.value) || 0)
+                            }
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          {t(
+                            'Set to 0 to disable. Increase this value to recharge the current 5-hour window.'
+                          )}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name='quota_weekly_limit_dollars'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          {t('Weekly limit ({{currency}})', {
+                            currency: currencyLabel,
+                          })}
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type='number'
+                            min='0'
+                            step={tokensOnly ? 1 : 0.01}
+                            placeholder='0'
+                            onChange={(e) =>
+                              field.onChange(parseFloat(e.target.value) || 0)
+                            }
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          {t('Set to 0 to disable the weekly key limit')}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              <FormField
+                control={form.control}
+                name='unlimited_quota'
+                render={({ field }) => (
+                  <FormItem className='flex min-h-16 flex-row items-center justify-between gap-3 rounded-lg border px-3 py-2.5 sm:min-h-20 sm:gap-4 sm:px-4 sm:py-3'>
+                    <div className='space-y-0.5'>
+                      <FormLabel className='text-sm'>
+                        {t('Unlimited Quota')}
+                      </FormLabel>
+                      <FormDescription className='text-xs'>
+                        {t('Enable unlimited quota for this API key')}
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
               {!unlimitedQuota && (
                 <FormField
                   control={form.control}
@@ -479,93 +574,6 @@ export function ApiKeysMutateDrawer({
                   )}
                 />
               )}
-
-              <FormField
-                control={form.control}
-                name='unlimited_quota'
-                render={({ field }) => (
-                  <FormItem className='flex min-h-16 flex-row items-center justify-between gap-3 rounded-lg border px-3 py-2.5 sm:min-h-20 sm:gap-4 sm:px-4 sm:py-3'>
-                    <div className='space-y-0.5'>
-                      <FormLabel className='text-sm'>
-                        {t('Unlimited Quota')}
-                      </FormLabel>
-                      <FormDescription className='text-xs'>
-                        {t('Enable unlimited quota for this API key')}
-                      </FormDescription>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-
-              <div className='grid gap-3 sm:grid-cols-2'>
-                <FormField
-                  control={form.control}
-                  name='quota_5h_limit_dollars'
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        {t('5-hour limit ({{currency}})', {
-                          currency: currencyLabel,
-                        })}
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type='number'
-                          min='0'
-                          step={tokensOnly ? 1 : 0.01}
-                          placeholder='0'
-                          onChange={(e) =>
-                            field.onChange(parseFloat(e.target.value) || 0)
-                          }
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        {t(
-                          'Set to 0 to disable. Increase this value to recharge the current 5-hour window.'
-                        )}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name='quota_weekly_limit_dollars'
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        {t('Weekly limit ({{currency}})', {
-                          currency: currencyLabel,
-                        })}
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type='number'
-                          min='0'
-                          step={tokensOnly ? 1 : 0.01}
-                          placeholder='0'
-                          onChange={(e) =>
-                            field.onChange(parseFloat(e.target.value) || 0)
-                          }
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        {t('Set to 0 to disable the weekly key limit')}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
             </ApiKeyFormSection>
 
             <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
