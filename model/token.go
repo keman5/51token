@@ -47,6 +47,13 @@ type Token struct {
 	DeletedAt          gorm.DeletedAt `gorm:"index"`
 }
 
+type TokenQuotaWindowResetResult struct {
+	Token      *Token
+	Reset5h    bool
+	ResetWeek  bool
+	ResetCount int
+}
+
 func (token *Token) Clean() {
 	token.Key = ""
 }
@@ -684,6 +691,50 @@ func ResetDueTokenQuotaWindows(limit int) (int, error) {
 	}
 
 	return resetCount, nil
+}
+
+func ResetDueTokenQuotaWindowsById(id int, userId int) (*TokenQuotaWindowResetResult, error) {
+	now := common.GetTimestamp()
+	result := &TokenQuotaWindowResetResult{}
+
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var token Token
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").
+			Where("id = ? AND user_id = ?", id, userId).
+			First(&token).Error; err != nil {
+			return err
+		}
+		if token.IsExpiredAt(now) {
+			return fmt.Errorf("token 已过期")
+		}
+
+		updates := map[string]interface{}{}
+		if token.Quota5hLimit > 0 {
+			updates["quota_5h_used"] = 0
+			updates["quota_5h_window_start"] = 0
+			result.Reset5h = true
+		}
+
+		if len(updates) > 0 {
+			if err := tx.Model(&Token{}).Where("id = ?", token.Id).Updates(updates).Error; err != nil {
+				return err
+			}
+			if result.Reset5h {
+				token.Quota5hUsed = 0
+				token.Quota5hWindowStart = 0
+				result.ResetCount++
+			}
+		}
+
+		PrepareTokenQuotaSummary(&token, now)
+		result.Token = &token
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 // CountUserTokens returns total number of tokens for the given user, used for pagination

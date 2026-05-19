@@ -28,6 +28,7 @@ import {
   Copy,
   Link,
   Loader2,
+  RotateCcw,
   MoreHorizontal as DotsHorizontalIcon,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -53,7 +54,7 @@ import {
 import { useChatPresets } from '@/features/chat/hooks/use-chat-presets'
 import { resolveChatUrl, type ChatPreset } from '@/features/chat/lib/chat-links'
 import { sendToFluent } from '@/features/chat/lib/send-to-fluent'
-import { updateApiKeyStatus } from '../api'
+import { resetDueApiKeyQuotaWindows, updateApiKeyStatus } from '../api'
 import { API_KEY_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants'
 import { apiKeySchema } from '../types'
 import { useApiKeys } from './api-keys-provider'
@@ -98,8 +99,11 @@ export function DataTableRowActions<TData>({
   const isEnabled = apiKey.status === API_KEY_STATUS.ENABLED
   const { chatPresets, serverAddress } = useChatPresets()
   const [isTogglingStatus, setIsTogglingStatus] = useState(false)
+  const [isResettingQuota, setIsResettingQuota] = useState(false)
 
   const hasChatPresets = chatPresets.length > 0
+  const hasWindowLimits =
+    apiKey.quota_5h_limit > 0 || apiKey.quota_weekly_limit > 0
 
   const handleOpenChatPreset = useCallback(
     async (preset: ChatPreset) => {
@@ -166,6 +170,27 @@ export function DataTableRowActions<TData>({
       toast.error(t(ERROR_MESSAGES.UNEXPECTED))
     } finally {
       setIsTogglingStatus(false)
+    }
+  }
+
+  const handleResetQuotaWindows = async () => {
+    setIsResettingQuota(true)
+    try {
+      const result = await resetDueApiKeyQuotaWindows(apiKey.id)
+      if (!result.success) {
+        toast.error(result.message || t(ERROR_MESSAGES.UNEXPECTED))
+        return
+      }
+      if ((result.data?.reset_count ?? 0) > 0) {
+        toast.success(result.message || t('5h quota reset'))
+      } else {
+        toast.info(result.message || t('No 5h quota limit configured'))
+      }
+      triggerRefresh()
+    } catch {
+      toast.error(t(ERROR_MESSAGES.UNEXPECTED))
+    } finally {
+      setIsResettingQuota(false)
     }
   }
 
@@ -245,6 +270,23 @@ export function DataTableRowActions<TData>({
             </DropdownMenuShortcut>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
+          {hasWindowLimits && (
+            <DropdownMenuItem
+              disabled={isResettingQuota}
+              onClick={handleResetQuotaWindows}
+            >
+              {isResettingQuota
+                ? t('Resetting 5h quota...')
+                : t('Reset 5h quota')}
+              <DropdownMenuShortcut>
+                {isResettingQuota ? (
+                  <Loader2 size={16} className='animate-spin' />
+                ) : (
+                  <RotateCcw size={16} />
+                )}
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem
             onClick={() => {
               setCurrentRow(apiKey)

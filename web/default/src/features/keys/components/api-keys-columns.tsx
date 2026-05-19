@@ -16,12 +16,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useState, type MouseEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { type ColumnDef } from '@tanstack/react-table'
+import { Loader2, RotateCcw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { getUserGroups } from '@/lib/api'
 import { formatQuota, formatTimestampToDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Progress } from '@/components/ui/progress'
 import {
@@ -32,6 +36,7 @@ import {
 import { DataTableColumnHeader } from '@/components/data-table'
 import { GroupBadge } from '@/components/group-badge'
 import { StatusBadge } from '@/components/status-badge'
+import { resetDueApiKeyQuotaWindows } from '../api'
 import { API_KEY_STATUSES } from '../constants'
 import { type ApiKey } from '../types'
 import {
@@ -39,6 +44,7 @@ import {
   ModelLimitsCell,
   IpRestrictionsCell,
 } from './api-keys-cells'
+import { useApiKeys } from './api-keys-provider'
 import { DataTableRowActions } from './data-table-row-actions'
 
 function getQuotaProgressColor(percentage: number): string {
@@ -99,6 +105,109 @@ function WindowQuotaLine({
         {expiresAt > 0 ? formatTimestampToDate(expiresAt) : '-'}
         <span className='ml-2'>-{formatQuota(used)}</span>
       </div>
+    </div>
+  )
+}
+
+function WindowLimitsCell({ apiKey }: { apiKey: ApiKey }) {
+  const { t } = useTranslation()
+  const { triggerRefresh } = useApiKeys()
+  const [isResetting, setIsResetting] = useState(false)
+  const hasFiveHourLimit = apiKey.quota_5h_limit > 0
+  const hasWeeklyLimit = apiKey.quota_weekly_limit > 0
+
+  if (!hasFiveHourLimit && !hasWeeklyLimit) {
+    return (
+      <StatusBadge
+        label={t('Disabled')}
+        variant='neutral'
+        copyable={false}
+      />
+    )
+  }
+
+  const handleResetQuotaWindows = async (
+    event: MouseEvent<HTMLButtonElement>
+  ) => {
+    event.stopPropagation()
+    setIsResetting(true)
+    try {
+      const result = await resetDueApiKeyQuotaWindows(apiKey.id)
+      if (!result.success) {
+        toast.error(result.message || t('Unexpected error occurred'))
+        return
+      }
+      if ((result.data?.reset_count ?? 0) > 0) {
+        toast.success(result.message || t('5h quota reset'))
+      } else {
+        toast.info(result.message || t('No 5h quota limit configured'))
+      }
+      triggerRefresh()
+    } catch {
+      toast.error(t('Unexpected error occurred'))
+    } finally {
+      setIsResetting(false)
+    }
+  }
+
+  return (
+    <div className='flex items-start gap-1.5'>
+      <Tooltip>
+        <TooltipTrigger render={<div className='w-[190px] space-y-2' />}>
+          <WindowQuotaLine
+            label='5h'
+            limit={apiKey.quota_5h_limit}
+            used={apiKey.quota_5h_used}
+            available={apiKey.quota_5h_available}
+            expiresAt={apiKey.quota_5h_expires_at}
+          />
+          <WindowQuotaLine
+            label={t('Weekly')}
+            limit={apiKey.quota_weekly_limit}
+            used={apiKey.quota_weekly_used}
+            available={apiKey.quota_weekly_available}
+            expiresAt={apiKey.quota_weekly_expires_at}
+          />
+        </TooltipTrigger>
+        <TooltipContent>
+          <div className='space-y-1 text-xs'>
+            {hasFiveHourLimit && (
+              <div>
+                5h: {formatQuota(apiKey.quota_5h_available)} /{' '}
+                {formatQuota(apiKey.quota_5h_limit)}
+              </div>
+            )}
+            {hasWeeklyLimit && (
+              <div>
+                {t('Weekly')}: {formatQuota(apiKey.quota_weekly_available)} /{' '}
+                {formatQuota(apiKey.quota_weekly_limit)}
+              </div>
+            )}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              variant='ghost'
+              size='icon-sm'
+              onClick={handleResetQuotaWindows}
+              disabled={isResetting}
+              aria-label={t('Reset 5h quota')}
+              className='mt-0.5 text-muted-foreground hover:text-foreground'
+            />
+          }
+        >
+          {isResetting ? (
+            <Loader2 className='size-3.5 animate-spin' />
+          ) : (
+            <RotateCcw className='size-3.5' />
+          )}
+        </TooltipTrigger>
+        <TooltipContent>{t('Reset 5h quota')}</TooltipContent>
+      </Tooltip>
     </div>
   )
 }
@@ -235,56 +344,7 @@ export function useApiKeysColumns(): ColumnDef<ApiKey>[] {
         <DataTableColumnHeader column={column} title={t('Window Limits')} />
       ),
       cell: ({ row }) => {
-        const apiKey = row.original
-        const hasFiveHourLimit = apiKey.quota_5h_limit > 0
-        const hasWeeklyLimit = apiKey.quota_weekly_limit > 0
-
-        if (!hasFiveHourLimit && !hasWeeklyLimit) {
-          return (
-            <StatusBadge
-              label={t('Disabled')}
-              variant='neutral'
-              copyable={false}
-            />
-          )
-        }
-
-        return (
-          <Tooltip>
-            <TooltipTrigger render={<div className='w-[190px] space-y-2' />}>
-              <WindowQuotaLine
-                label='5h'
-                limit={apiKey.quota_5h_limit}
-                used={apiKey.quota_5h_used}
-                available={apiKey.quota_5h_available}
-                expiresAt={apiKey.quota_5h_expires_at}
-              />
-              <WindowQuotaLine
-                label={t('Weekly')}
-                limit={apiKey.quota_weekly_limit}
-                used={apiKey.quota_weekly_used}
-                available={apiKey.quota_weekly_available}
-                expiresAt={apiKey.quota_weekly_expires_at}
-              />
-            </TooltipTrigger>
-            <TooltipContent>
-              <div className='space-y-1 text-xs'>
-                {hasFiveHourLimit && (
-                  <div>
-                    5h: {formatQuota(apiKey.quota_5h_available)} /{' '}
-                    {formatQuota(apiKey.quota_5h_limit)}
-                  </div>
-                )}
-                {hasWeeklyLimit && (
-                  <div>
-                    {t('Weekly')}: {formatQuota(apiKey.quota_weekly_available)}{' '}
-                    / {formatQuota(apiKey.quota_weekly_limit)}
-                  </div>
-                )}
-              </div>
-            </TooltipContent>
-          </Tooltip>
-        )
+        return <WindowLimitsCell apiKey={row.original} />
       },
       enableSorting: false,
       meta: { label: t('Window Limits'), mobileHidden: true },

@@ -24,6 +24,7 @@ import type {
   GetApiKeysResponse,
   SearchApiKeysParams,
   ApiKeyFormData,
+  ApiKeyQuotaWindowResetResult,
 } from './types'
 
 // ============================================================================
@@ -113,5 +114,12 @@ export async function fetchTokenKeysBatch(ids: number[]): Promise<{
   data?: { keys: Record<number, string> }
 }> {
   const res = await api.post('/api/token/batch/keys', { ids })
+  return res.data
+}
+
+export async function resetDueApiKeyQuotaWindows(
+  id: number
+): Promise<ApiResponse<ApiKeyQuotaWindowResetResult>> {
+  const res = await api.post(`/api/token/${id}/quota_windows/reset`)
   return res.data
 }

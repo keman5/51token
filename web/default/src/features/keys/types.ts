@@ -106,6 +106,13 @@ export interface ApiKeyFormData {
   cross_group_retry: boolean
 }
 
+export interface ApiKeyQuotaWindowResetResult {
+  token: ApiKey
+  reset_5h: boolean
+  reset_weekly: boolean
+  reset_count: number
+}
+
 // ============================================================================
 // Dialog Types
 // ============================================================================

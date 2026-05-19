@@ -52,6 +52,13 @@ type tokenKeyResponse struct {
 	Key string `json:"key"`
 }
 
+type tokenQuotaWindowResetResponse struct {
+	Token       tokenResponseItem `json:"token"`
+	Reset5h     bool              `json:"reset_5h"`
+	ResetWeekly bool              `json:"reset_weekly"`
+	ResetCount  int               `json:"reset_count"`
+}
+
 type sqliteColumnInfo struct {
 	Name string `gorm:"column:name"`
 	Type string `gorm:"column:type"`
@@ -709,6 +716,69 @@ func TestUpdateTokenRenewingExpiredTokenRefillsWindowLimits(t *testing.T) {
 	}
 	if updated.Quota5hUsed != 0 || updated.WeeklyUsed != 0 {
 		t.Fatalf("expected renewed token windows to refill, got 5h_used=%d weekly_used=%d", updated.Quota5hUsed, updated.WeeklyUsed)
+	}
+}
+
+func TestResetTokenQuotaWindowsRefillsFiveHourWindow(t *testing.T) {
+	db := setupTokenControllerTestDB(t)
+	token := seedToken(t, db, 1, "five-hour-window-token", "hour1234window5678")
+	now := common.GetTimestamp()
+	createdTime := now - 15*24*60*60
+	lastWeekStart := createdTime
+	if err := db.Model(&model.Token{}).Where("id = ?", token.Id).Updates(map[string]any{
+		"created_time":              createdTime,
+		"expired_time":              now + 24*60*60,
+		"remain_quota":              1000,
+		"unlimited_quota":           true,
+		"quota_5h_limit":            100,
+		"quota_5h_used":             100,
+		"quota_5h_window_start":     now,
+		"quota_weekly_limit":        500,
+		"quota_weekly_used":         400,
+		"quota_weekly_window_start": lastWeekStart,
+	}).Error; err != nil {
+		t.Fatalf("failed to seed quota windows: %v", err)
+	}
+
+	ctx, recorder := newAuthenticatedContext(t, http.MethodPost, "/api/token/"+strconv.Itoa(token.Id)+"/quota_windows/reset", nil, 1)
+	ctx.Params = gin.Params{{Key: "id", Value: strconv.Itoa(token.Id)}}
+	ResetTokenQuotaWindows(ctx)
+
+	response := decodeAPIResponse(t, recorder)
+	if !response.Success {
+		t.Fatalf("expected success response, got message: %s", response.Message)
+	}
+	var detail tokenQuotaWindowResetResponse
+	if err := common.Unmarshal(response.Data, &detail); err != nil {
+		t.Fatalf("failed to decode reset response: %v", err)
+	}
+	if !detail.Reset5h || detail.ResetWeekly || detail.ResetCount != 1 {
+		t.Fatalf("expected only 5h window reset, got 5h=%v weekly=%v count=%d", detail.Reset5h, detail.ResetWeekly, detail.ResetCount)
+	}
+	if detail.Token.Key != token.GetMaskedKey() {
+		t.Fatalf("expected masked token key %q, got %q", token.GetMaskedKey(), detail.Token.Key)
+	}
+	if strings.Contains(recorder.Body.String(), token.Key) {
+		t.Fatalf("reset response leaked raw token key: %s", recorder.Body.String())
+	}
+
+	var updated model.Token
+	if err := db.First(&updated, token.Id).Error; err != nil {
+		t.Fatalf("failed to load updated token: %v", err)
+	}
+	if updated.Quota5hUsed != 0 || updated.Quota5hWindowStart != 0 {
+		t.Fatalf("expected 5h window to be released, got used=%d start=%d", updated.Quota5hUsed, updated.Quota5hWindowStart)
+	}
+	if updated.WeeklyUsed != 400 || updated.WeeklyWindowStart != lastWeekStart {
+		t.Fatalf("expected weekly window to remain unchanged, got used=%d start=%d", updated.WeeklyUsed, updated.WeeklyWindowStart)
+	}
+
+	otherCtx, otherRecorder := newAuthenticatedContext(t, http.MethodPost, "/api/token/"+strconv.Itoa(token.Id)+"/quota_windows/reset", nil, 2)
+	otherCtx.Params = gin.Params{{Key: "id", Value: strconv.Itoa(token.Id)}}
+	ResetTokenQuotaWindows(otherCtx)
+	otherResponse := decodeAPIResponse(t, otherRecorder)
+	if otherResponse.Success {
+		t.Fatalf("expected other user reset to fail")
 	}
 }
 

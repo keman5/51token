@@ -355,6 +355,37 @@ func UpdateToken(c *gin.Context) {
 	})
 }
 
+func ResetTokenQuotaWindows(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	userId := c.GetInt("id")
+
+	result, err := model.ResetDueTokenQuotaWindowsById(id, userId)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	message := "该令牌未配置5小时限额"
+	if result.Reset5h {
+		message = "已重置5小时限额"
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": message,
+		"data": gin.H{
+			"token":        buildMaskedTokenResponse(result.Token),
+			"reset_5h":     result.Reset5h,
+			"reset_weekly": result.ResetWeek,
+			"reset_count":  result.ResetCount,
+		},
+	})
+}
+
 type TokenBatch struct {
 	Ids []int `json:"ids"`
 }
